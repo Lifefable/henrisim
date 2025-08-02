@@ -250,8 +250,8 @@
                         <div class="recent-decisions">
                             <div class="decisions-label">Recent Decisions</div>
                             <div class="decisions-list">
-                                <div v-for="decision in simulationStore.recentDecisions.slice(-3)" :key="decision.timestamp" 
-                                     class="decision-item">
+                                <div v-for="decision in simulationStore.recentDecisions.slice(-3)" :key="decision.id"
+                                    class="decision-item">
                                     <span class="decision-time">{{ formatDecisionTime(decision.timestamp) }}</span>
                                     <span class="decision-text">{{ decision.action }}</span>
                                 </div>
@@ -270,19 +270,106 @@
                 <!-- Testing Panel -->
                 <div class="testing-panel">
                     <h3>🧪 Testing & Scenarios</h3>
-                    <div class="testing-controls">
-                        <BaseButton @click="simulationStore.triggerSmokeEvent()" variant="danger" size="sm">
-                            Trigger Smoke Event
-                        </BaseButton>
-                        <BaseButton @click="setTimeOfDay('morning')" variant="ghost" size="sm">
-                            Morning (06:00)
-                        </BaseButton>
-                        <BaseButton @click="setTimeOfDay('noon')" variant="ghost" size="sm">
-                            Noon (12:00)
-                        </BaseButton>
-                        <BaseButton @click="setTimeOfDay('evening')" variant="ghost" size="sm">
-                            Evening (18:00)
-                        </BaseButton>
+
+                    <!-- Active Test Scenario Display -->
+                    <div v-if="simulationStore.activeTestScenario" class="active-scenario-panel">
+                        <div class="scenario-header">
+                            <div class="scenario-info">
+                                <h4>🔬 Active Test Scenario</h4>
+                                <div class="scenario-details">
+                                    <span class="scenario-name">{{ simulationStore.activeTestScenario.name }}</span>
+                                    <span class="scenario-description">{{ simulationStore.activeTestScenario.description
+                                        }}</span>
+                                </div>
+                            </div>
+                            <BaseButton @click="simulationStore.clearTestScenario()" variant="secondary" size="sm">
+                                ❌ Clear Scenario
+                            </BaseButton>
+                        </div>
+                    </div>
+
+                    <!-- Environmental Test Scenarios -->
+                    <div class="test-section">
+                        <h4>🌡️ Environmental Tests</h4>
+                        <div class="testing-controls">
+                            <BaseButton @click="simulationStore.triggerTestScenario('heatWave')" variant="danger"
+                                size="sm">
+                                🔥 Heat Wave
+                            </BaseButton>
+                            <BaseButton @click="simulationStore.triggerTestScenario('coldSnap')" variant="primary"
+                                size="sm">
+                                🥶 Cold Snap
+                            </BaseButton>
+                            <BaseButton @click="simulationStore.triggerTestScenario('poorAirQuality')"
+                                variant="secondary" size="sm">
+                                💨 Poor Air Quality
+                            </BaseButton>
+                        </div>
+                    </div>
+
+                    <!-- Energy Test Scenarios -->
+                    <div class="test-section">
+                        <h4>⚡ Energy Tests</h4>
+                        <div class="testing-controls">
+                            <BaseButton @click="simulationStore.triggerTestScenario('lowBattery')" variant="secondary"
+                                size="sm">
+                                🔋 Low Battery
+                            </BaseButton>
+                            <BaseButton @click="simulationStore.triggerTestScenario('powerOutage')" variant="danger"
+                                size="sm">
+                                ⚫ Power Outage
+                            </BaseButton>
+                        </div>
+                    </div>
+
+                    <!-- Safety & Complex Tests -->
+                    <div class="test-section">
+                        <h4>🚨 Safety & Complex Tests</h4>
+                        <div class="testing-controls">
+                            <BaseButton @click="simulationStore.triggerTestScenario('smokeAlarm')" variant="danger"
+                                size="sm">
+                                🚨 Smoke Alarm
+                            </BaseButton>
+                            <BaseButton @click="simulationStore.triggerTestScenario('comfortChallenge')"
+                                variant="secondary" size="sm">
+                                😰 Comfort Challenge
+                            </BaseButton>
+                        </div>
+                    </div>
+
+                    <!-- Time Controls -->
+                    <div class="test-section">
+                        <h4>🕐 Time Controls</h4>
+                        <div class="testing-controls">
+                            <BaseButton @click="setTimeOfDay('morning')" variant="ghost" size="sm">
+                                🌅 Morning (06:00)
+                            </BaseButton>
+                            <BaseButton @click="setTimeOfDay('noon')" variant="ghost" size="sm">
+                                ☀️ Noon (12:00)
+                            </BaseButton>
+                            <BaseButton @click="setTimeOfDay('evening')" variant="ghost" size="sm">
+                                🌆 Evening (18:00)
+                            </BaseButton>
+                        </div>
+                    </div>
+
+                    <!-- Telemetry Controls -->
+                    <div class="test-section">
+                        <h4>📊 Telemetry</h4>
+                        <div class="testing-controls">
+                            <BaseButton @click="enableTelemetryLogging" variant="primary" size="sm"
+                                :disabled="telemetryEnabled">
+                                {{ telemetryEnabled ? '✅ Logging Enabled' : '📊 Enable Logging' }}
+                            </BaseButton>
+                            <BaseButton @click="clearConsole" variant="ghost" size="sm">
+                                🗑️ Clear Console
+                            </BaseButton>
+                        </div>
+                    </div>
+
+                    <div class="telemetry-info">
+                        <p><strong>📈 Telemetry Status:</strong> {{ telemetryStatusText }}</p>
+                        <p><strong>🎯 Performance Focus:</strong> {{ performanceFocusText }}</p>
                     </div>
                 </div>
 
@@ -407,7 +494,7 @@ const setTimeOfDay = (timeOfDay: string) => {
 const getModeIcon = (mode: string) => {
     const modeIcons = {
         'normal': '🏠',
-        'emergency': '🚨', 
+        'emergency': '🚨',
         'energy-saving': '💡',
         'comfort-priority': '😌',
         'high-solar': '☀️',
@@ -431,6 +518,42 @@ const formatMode = (mode: string) => {
 const formatDecisionTime = (timestamp: number) => {
     const hour = Math.floor(timestamp)
     return `${hour.toString().padStart(2, '0')}:00`
+}
+
+// Telemetry Controls
+const telemetryEnabled = ref(false)
+
+// Computed properties to prevent linter from breaking strings
+const telemetryStatusText = computed(() =>
+    telemetryEnabled.value
+        ? 'Active - Check console for detailed logs'
+        : 'Disabled'
+)
+
+const performanceFocusText = computed(() =>
+    'Henri\'s decision accuracy, energy efficiency, comfort maintenance'
+)
+
+const enableTelemetryLogging = () => {
+    telemetryEnabled.value = true
+    console.log('%c🔧 HENRI TELEMETRY ENABLED', 'color: #16a34a; font-weight: bold; font-size: 16px;')
+    console.log('%cDetailed performance logging is now active. Run simulation steps to see Henri\'s decision-making process.', 'color: #059669;')
+    console.log('%cLook for these sections in the logs:', 'color: #374151;')
+    console.log('  🤖 Henri Decision Cycle - Overall adaptive analysis')
+    console.log('  📊 Environmental Analysis - Current conditions and targets')
+    console.log('  🧠 Henri\'s Current Mode - Operating mode and recent decisions')
+    console.log('  ⚙️  Adaptive Configurations - System settings adjustments')
+    console.log('  📈 Performance Metrics - Temperature error, comfort trends, efficiency')
+    console.log('  🔧 Module Performance - Individual system performance')
+    console.log('  🏁 Simulation Cycle Complete - Timing and summary')
+    console.log('')
+}
+
+const clearConsole = () => {
+    console.clear()
+    if (telemetryEnabled.value) {
+        console.log('%c🗑️ Console cleared - Telemetry logging continues', 'color: #6b7280; font-style: italic;')
+    }
 }
 </script>
 
@@ -907,6 +1030,100 @@ input:checked+.toggle-slider:before {
     flex-wrap: wrap;
 }
 
+.test-section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.test-section:last-of-type {
+    border-bottom: none;
+    margin-bottom: 0.5rem;
+}
+
+.test-section h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.telemetry-info {
+    background: #f3f4f6;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-top: 1rem;
+    border-left: 4px solid #3b82f6;
+}
+
+.telemetry-info p {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.85rem;
+    color: #374151;
+}
+
+.telemetry-info p:last-child {
+    margin-bottom: 0;
+}
+
+.active-scenario-panel {
+    background: #fef3c7;
+    border: 2px solid #f59e0b;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    animation: pulse-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes pulse-glow {
+    0% {
+        box-shadow: 0 0 5px rgba(245, 158, 11, 0.3);
+    }
+
+    100% {
+        box-shadow: 0 0 20px rgba(245, 158, 11, 0.6);
+    }
+}
+
+.scenario-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.scenario-info {
+    flex: 1;
+}
+
+.scenario-info h4 {
+    margin: 0 0 0.5rem 0;
+    color: #92400e;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.scenario-details {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.scenario-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #78350f;
+}
+
+.scenario-description {
+    font-size: 0.9rem;
+    color: #a16207;
+    font-weight: 500;
+}
+
 @media (min-width: 1920px) {
     .metrics-grid {
         grid-template-columns: repeat(6, 200px);
@@ -1001,6 +1218,16 @@ input:checked+.toggle-slider:before {
 
     .time-display h2 {
         font-size: 1.5rem;
+    }
+
+    .scenario-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+
+    .scenario-details {
+        margin-bottom: 0.5rem;
     }
 }
 

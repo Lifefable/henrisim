@@ -58,8 +58,18 @@ export const useSimulationStore = defineStore('simulation', () => {
 
   // Henri's Decision Engine State
   const currentMode = ref('normal')
-  const recentDecisions = ref<Array<{ timestamp: number; action: string; reason: string }>>([])
+  const recentDecisions = ref<
+    Array<{ id: number; timestamp: number; action: string; reason: string }>
+  >([])
   const nextAdaptation = ref<string | null>(null)
+
+  // Test Scenario State
+  const activeTestScenario = ref<{
+    type: string
+    name: string
+    description: string
+    startTime: number
+  } | null>(null)
 
   // Module configurations
   const moduleConfigs = reactive<ModuleConfigs>({
@@ -111,18 +121,150 @@ export const useSimulationStore = defineStore('simulation', () => {
     }
   }
 
+  // === TELEMETRY & PERFORMANCE LOGGING ===
+
+  const logHenriPerformance = (preState: HouseState) => {
+    const timestamp = new Date().toISOString()
+    const postState = houseState
+
+    console.log(
+      `%c🤖 HENRI DECISION CYCLE - ${timestamp}`,
+      'color: #2563eb; font-weight: bold; font-size: 14px;',
+    )
+
+    // Environmental conditions analysis
+    console.log('%c📊 Environmental Analysis:', 'color: #059669; font-weight: bold;')
+    console.log('  🌡️  Outdoor Temp:', `${postState.outdoor.temperature.toFixed(1)}°C`)
+    console.log(
+      '  🏠 Indoor Temp:',
+      `${postState.indoor.temperature.toFixed(1)}°C (Target: ${moduleConfigs.heatPump.targetTemperature}°C)`,
+    )
+    console.log('  ☀️  Solar Radiation:', `${postState.outdoor.solarRadiation}W/m²`)
+    console.log('  💨 Air Quality Index:', `${Math.round(postState.outdoor.airQualityIndex)}`)
+    console.log('  🔋 Battery Level:', `${Math.round((postState.energy.batteryKWh / 20) * 100)}%`)
+    console.log('  😊 Comfort Score:', `${Math.round(postState.comfortScore)}%`)
+
+    // Henri's adaptive decisions
+    console.log("%c🧠 Henri's Current Mode:", 'color: #7c3aed; font-weight: bold;')
+    console.log('  Mode:', currentMode.value)
+    console.log('  Recent Decisions:', recentDecisions.value.length)
+    console.log('  Next Adaptation:', nextAdaptation.value || 'None planned')
+
+    // System configurations
+    console.log('%c⚙️  Adaptive Configurations:', 'color: #dc2626; font-weight: bold;')
+    console.log('  Heat Pump Efficiency:', `${moduleConfigs.heatPump.efficiency.toFixed(2)}`)
+    console.log('  Heat Pump Target:', `${moduleConfigs.heatPump.targetTemperature}°C`)
+    console.log('  ERV Flow Rate:', `${moduleConfigs.erv.flowRate} CFM`)
+    console.log('  ERV Efficiency:', `${(moduleConfigs.erv.efficiency * 100).toFixed(0)}%`)
+
+    // Performance indicators
+    const tempError = Math.abs(
+      postState.indoor.temperature - moduleConfigs.heatPump.targetTemperature,
+    )
+    const comfortTrend =
+      history.value.length > 2
+        ? postState.comfortScore - history.value[history.value.length - 2].comfortScore
+        : 0
+
+    console.log('%c📈 Performance Metrics:', 'color: #ea580c; font-weight: bold;')
+    console.log('  Temperature Error:', `${tempError.toFixed(2)}°C`)
+    console.log('  Comfort Trend:', `${comfortTrend > 0 ? '+' : ''}${comfortTrend.toFixed(1)}%`)
+    console.log(
+      '  Energy Efficiency:',
+      `${((postState.energy.solarKWh / Math.max(1, postState.energy.netKWh)) * 100).toFixed(1)}%`,
+    )
+    console.log('')
+  }
+
+  const logModulePerformance = (
+    moduleName: string,
+    preState: HouseState,
+    postState: HouseState,
+    executionTime: number,
+  ) => {
+    console.log(`%c🔧 MODULE: ${moduleName.toUpperCase()}`, 'color: #0891b2; font-weight: bold;')
+
+    switch (moduleName) {
+      case 'heatPump':
+        const tempChange = postState.indoor.temperature - preState.indoor.temperature
+        const energyUsed = postState.energy.heatPumpKWh - preState.energy.heatPumpKWh
+        console.log(
+          `  🌡️  Temperature Change: ${tempChange > 0 ? '+' : ''}${tempChange.toFixed(3)}°C`,
+        )
+        console.log(`  ⚡ Energy Consumed: ${energyUsed.toFixed(3)} kWh`)
+        console.log(
+          `  📊 COP Actual: ${energyUsed > 0 ? (tempChange / energyUsed).toFixed(2) : 'N/A'}`,
+        )
+        break
+
+      case 'erv':
+        const airQualityChange = postState.indoor.airQuality - preState.indoor.airQuality
+        const ervEnergy = postState.energy.ervKWh - preState.energy.ervKWh
+        console.log(
+          `  💨 Air Quality Change: ${airQualityChange > 0 ? '+' : ''}${(airQualityChange * 100).toFixed(1)}%`,
+        )
+        console.log(`  ⚡ Energy Consumed: ${ervEnergy.toFixed(3)} kWh`)
+        console.log(`  🌀 Flow Rate: ${moduleConfigs.erv.flowRate} CFM`)
+        break
+
+      case 'solar':
+        const solarGenerated = postState.energy.solarKWh - preState.energy.solarKWh
+        console.log(`  ☀️  Energy Generated: ${solarGenerated.toFixed(3)} kWh`)
+        console.log(`  📈 Generation Rate: ${((solarGenerated / 1) * 1000).toFixed(0)} W`)
+        console.log(`  🌤️  Solar Radiation: ${postState.outdoor.solarRadiation} W/m²`)
+        break
+
+      case 'battery':
+        const batteryChange = postState.energy.batteryKWh - preState.energy.batteryKWh
+        const batteryPercent = (postState.energy.batteryKWh / 20) * 100
+        console.log(
+          `  🔋 Battery Change: ${batteryChange > 0 ? '+' : ''}${batteryChange.toFixed(3)} kWh`,
+        )
+        console.log(`  📊 Battery Level: ${batteryPercent.toFixed(1)}%`)
+        console.log(
+          `  ${batteryChange > 0 ? '⬆️  Charging' : batteryChange < 0 ? '⬇️  Discharging' : '⏸️  Idle'}`,
+        )
+        break
+    }
+
+    console.log(`  ⏱️  Execution Time: ${executionTime.toFixed(2)}ms`)
+    console.log('')
+  }
+
+  const logSimulationCycle = (startTime: number, endTime: number) => {
+    const cycleTime = endTime - startTime
+    const timestamp = new Date().toISOString()
+
+    console.log(
+      `%c🏁 SIMULATION CYCLE COMPLETE - ${timestamp}`,
+      'color: #16a34a; font-weight: bold; font-size: 14px;',
+    )
+    console.log(`  ⏱️  Total Cycle Time: ${cycleTime.toFixed(2)}ms`)
+    console.log(`  🕐 Simulation Time: ${houseState.time.toString().padStart(2, '0')}:00`)
+    console.log(`  📅 Simulation Date: ${houseState.date}`)
+    console.log(`%c${'='.repeat(80)}`, 'color: #6b7280;')
+    console.log('')
+  }
+
   const runSimulation = (timestepHours = 1) => {
+    const startTime = performance.now()
+
     // Save current state to history
     saveToHistory()
 
     // Henri's adaptive analysis - analyze environment first
+    const preAnalysisState = JSON.parse(JSON.stringify(houseState))
     analyzeEnvironment()
+    logHenriPerformance(preAnalysisState)
 
     // Run enabled modules in sequence
     const enabledModules = modules.value.filter((m) => m.enabled)
 
     for (const module of enabledModules) {
       try {
+        const moduleStartTime = performance.now()
+        const preModuleState = JSON.parse(JSON.stringify(houseState))
+
         // Pass module config for modules that need it
         if (module.name === 'heatPump') {
           // Inject target temperature into heat pump simulation
@@ -142,10 +284,21 @@ export const useSimulationStore = defineStore('simulation', () => {
         } else {
           module.simulate(houseState, timestepHours)
         }
+
+        const moduleEndTime = performance.now()
+        logModulePerformance(
+          module.name,
+          preModuleState,
+          houseState,
+          moduleEndTime - moduleStartTime,
+        )
       } catch (error) {
         console.error(`Error in module ${module.name}:`, error)
       }
     }
+
+    const endTime = performance.now()
+    logSimulationCycle(startTime, endTime)
 
     // Update comfort score
     updateComfortScore()
@@ -257,11 +410,13 @@ export const useSimulationStore = defineStore('simulation', () => {
   }
 
   // Henri's Adaptive Decision Engine
+  const decisionIdCounter = ref(0)
   const addDecision = (action: string, reason: string) => {
     recentDecisions.value.push({
+      id: decisionIdCounter.value++,
       timestamp: houseState.time,
       action,
-      reason
+      reason,
     })
     // Keep only last 10 decisions
     if (recentDecisions.value.length > 10) {
@@ -272,19 +427,19 @@ export const useSimulationStore = defineStore('simulation', () => {
   const analyzeEnvironment = () => {
     // Reset next adaptation
     nextAdaptation.value = null
-    
+
     // Emergency mode - smoke event
     if (houseState.safety.smokeEvent) {
       if (currentMode.value !== 'emergency') {
         currentMode.value = 'emergency'
         addDecision('Emergency mode activated', 'Smoke event detected')
-        
+
         // Activate sprinkler system
         houseState.safety.sprinklersActive = true
         addDecision('Sprinklers activated', 'Fire safety protocol')
-        
+
         // Increase ERV flow rate for smoke evacuation
-        const ervModule = modules.value.find(m => m.name === 'erv')
+        const ervModule = modules.value.find((m) => m.name === 'erv')
         if (ervModule?.enabled) {
           moduleConfigs.erv.flowRate = 400 // Double flow rate
           addDecision('ERV emergency ventilation', 'Evacuating contaminated air')
@@ -297,29 +452,35 @@ export const useSimulationStore = defineStore('simulation', () => {
     if (houseState.outdoor.solarRadiation > 700) {
       if (currentMode.value !== 'high-solar') {
         currentMode.value = 'high-solar'
-        addDecision('High solar mode activated', `Solar radiation: ${houseState.outdoor.solarRadiation}W/m²`)
-        
+        addDecision(
+          'High solar mode activated',
+          `Solar radiation: ${houseState.outdoor.solarRadiation}W/m²`,
+        )
+
         // Reduce heat pump efficiency due to solar heat gain
         moduleConfigs.heatPump.efficiency = 2.8 // Reduced from 3.5
         addDecision('Heat pump efficiency reduced', 'Compensating for solar heat gain')
       }
-      
+
       // Predict when to reduce solar impact
       if (houseState.time < 16) {
         nextAdaptation.value = 'Will reduce solar heat gain at peak (15:00)'
       }
     }
 
-    // Low battery adaptation  
+    // Low battery adaptation
     const batteryPercent = (houseState.energy.batteryKWh / 20) * 100
     if (batteryPercent < 20 && currentMode.value !== 'low-battery') {
       currentMode.value = 'low-battery'
       addDecision('Low battery mode activated', `Battery at ${Math.round(batteryPercent)}%`)
-      
+
       // Reduce heat pump target temperature to conserve energy
-      moduleConfigs.heatPump.targetTemperature = Math.max(19, moduleConfigs.heatPump.targetTemperature - 1)
+      moduleConfigs.heatPump.targetTemperature = Math.max(
+        19,
+        moduleConfigs.heatPump.targetTemperature - 1,
+      )
       addDecision('Temperature setpoint lowered', 'Conserving battery energy')
-      
+
       nextAdaptation.value = 'Will restore normal temperature when battery > 30%'
     }
 
@@ -327,8 +488,11 @@ export const useSimulationStore = defineStore('simulation', () => {
     if (houseState.outdoor.airQualityIndex > 100) {
       if (currentMode.value !== 'air-quality-protection') {
         currentMode.value = 'air-quality-protection'
-        addDecision('Air quality protection mode', `Outdoor AQI: ${Math.round(houseState.outdoor.airQualityIndex)}`)
-        
+        addDecision(
+          'Air quality protection mode',
+          `Outdoor AQI: ${Math.round(houseState.outdoor.airQualityIndex)}`,
+        )
+
         // Reduce ERV flow rate to minimize outdoor air intake
         moduleConfigs.erv.flowRate = Math.max(100, moduleConfigs.erv.flowRate * 0.6)
         addDecision('ERV flow reduced', 'Limiting outdoor air intake')
@@ -339,48 +503,156 @@ export const useSimulationStore = defineStore('simulation', () => {
     if (houseState.comfortScore < 60 && currentMode.value !== 'comfort-priority') {
       currentMode.value = 'comfort-priority'
       addDecision('Comfort priority mode', `Comfort score: ${houseState.comfortScore}%`)
-      
+
       // Boost heat pump efficiency
       moduleConfigs.heatPump.efficiency = 4.0
       addDecision('Heat pump efficiency boosted', 'Prioritizing occupant comfort')
-      
+
       // Increase ERV efficiency
       moduleConfigs.erv.efficiency = 0.8
       addDecision('ERV efficiency increased', 'Improving air quality')
-      
+
       nextAdaptation.value = 'Will return to normal when comfort > 80%'
     }
 
     // Return to normal mode conditions
     if (currentMode.value !== 'normal') {
       let shouldReturnToNormal = false
-      
+
       if (currentMode.value === 'high-solar' && houseState.outdoor.solarRadiation < 500) {
         shouldReturnToNormal = true
         moduleConfigs.heatPump.efficiency = 3.5 // Restore normal efficiency
       }
-      
+
       if (currentMode.value === 'low-battery' && batteryPercent > 30) {
         shouldReturnToNormal = true
         moduleConfigs.heatPump.targetTemperature = 21 // Restore normal temperature
       }
-      
+
       if (currentMode.value === 'comfort-priority' && houseState.comfortScore > 80) {
         shouldReturnToNormal = true
         moduleConfigs.heatPump.efficiency = 3.5 // Restore normal efficiency
         moduleConfigs.erv.efficiency = 0.7 // Restore normal efficiency
       }
-      
-      if (currentMode.value === 'air-quality-protection' && houseState.outdoor.airQualityIndex < 75) {
+
+      if (
+        currentMode.value === 'air-quality-protection' &&
+        houseState.outdoor.airQualityIndex < 75
+      ) {
         shouldReturnToNormal = true
         moduleConfigs.erv.flowRate = 200 // Restore normal flow rate
       }
-      
+
       if (shouldReturnToNormal) {
         currentMode.value = 'normal'
         addDecision('Normal operation restored', 'Environmental conditions normalized')
         nextAdaptation.value = null
       }
+    }
+  }
+
+  // === TESTING SCENARIO CONTROLS ===
+
+  const triggerTestScenario = (scenarioType: string) => {
+    console.log(
+      `%c🧪 TRIGGERING TEST SCENARIO: ${scenarioType}`,
+      'color: #dc2626; font-weight: bold; font-size: 16px;',
+    )
+
+    let scenarioName = ''
+    let scenarioDescription = ''
+
+    switch (scenarioType) {
+      case 'heatWave':
+        houseState.outdoor.temperature = 38
+        houseState.outdoor.solarRadiation = 950
+        houseState.outdoor.humidity = 0.3
+        scenarioName = 'Heat Wave'
+        scenarioDescription = 'Extreme heat: 38°C, 950W/m² solar'
+        addDecision('TEST: Heat wave scenario triggered', 'Outdoor temp: 38°C, Solar: 950W/m²')
+        break
+
+      case 'coldSnap':
+        houseState.outdoor.temperature = -15
+        houseState.outdoor.solarRadiation = 200
+        houseState.outdoor.humidity = 0.7
+        scenarioName = 'Cold Snap'
+        scenarioDescription = 'Extreme cold: -15°C, low solar'
+        addDecision('TEST: Cold snap scenario triggered', 'Outdoor temp: -15°C, Solar: 200W/m²')
+        break
+
+      case 'poorAirQuality':
+        houseState.outdoor.airQualityIndex = 180
+        scenarioName = 'Poor Air Quality'
+        scenarioDescription = 'Unhealthy air: AQI 180'
+        addDecision('TEST: Poor air quality scenario', 'AQI: 180 (Unhealthy)')
+        break
+
+      case 'lowBattery':
+        houseState.energy.batteryKWh = 2 // 10%
+        scenarioName = 'Low Battery'
+        scenarioDescription = 'Critical battery: 10% remaining'
+        addDecision('TEST: Low battery scenario', 'Battery at 10%')
+        break
+
+      case 'powerOutage':
+        houseState.energy.solarKWh = 0
+        houseState.energy.netKWh = 0
+        scenarioName = 'Power Outage'
+        scenarioDescription = 'No grid or solar power'
+        addDecision('TEST: Power outage scenario', 'No grid or solar power')
+        break
+
+      case 'smokeAlarm':
+        triggerSmokeEvent()
+        scenarioName = 'Smoke Alarm'
+        scenarioDescription = 'Emergency: Smoke detected'
+        addDecision('TEST: Smoke alarm scenario', 'Emergency ventilation activated')
+        break
+
+      case 'comfortChallenge':
+        houseState.outdoor.temperature = 32
+        houseState.indoor.temperature = 25
+        houseState.energy.batteryKWh = 4 // 20%
+        houseState.outdoor.airQualityIndex = 120
+        scenarioName = 'Comfort Challenge'
+        scenarioDescription = 'Multiple stressors active'
+        addDecision('TEST: Comfort challenge', 'Multiple stressors active')
+        break
+
+      default:
+        console.warn('Unknown test scenario:', scenarioType)
+        return
+    }
+
+    // Set active scenario
+    activeTestScenario.value = {
+      type: scenarioType,
+      name: scenarioName,
+      description: scenarioDescription,
+      startTime: Date.now(),
+    }
+
+    // Force immediate adaptation analysis
+    analyzeEnvironment()
+    console.log(
+      `%c✅ Test scenario "${scenarioType}" applied`,
+      'color: #059669; font-weight: bold;',
+    )
+  }
+
+  const clearTestScenario = () => {
+    if (activeTestScenario.value) {
+      console.log(
+        `%c🔄 CLEARING TEST SCENARIO: ${activeTestScenario.value.name}`,
+        'color: #059669; font-weight: bold;',
+      )
+      activeTestScenario.value = null
+      addDecision('Test scenario cleared', 'Returning to normal conditions')
+
+      // Reset to normal conditions
+      updateClimateConditions()
+      runSimulation()
     }
   }
 
@@ -392,11 +664,14 @@ export const useSimulationStore = defineStore('simulation', () => {
     history,
     modules,
     moduleConfigs,
-    
+
     // Henri's Decision Engine
     currentMode,
     recentDecisions,
     nextAdaptation,
+
+    // Test Scenarios
+    activeTestScenario,
 
     // Getters
     currentHour,
@@ -416,6 +691,8 @@ export const useSimulationStore = defineStore('simulation', () => {
     triggerSmokeEvent,
     clearSmokeEvent,
     analyzeEnvironment,
+    triggerTestScenario,
+    clearTestScenario,
   }
 })
 
