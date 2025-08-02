@@ -58,7 +58,7 @@ export interface HouseState {
 export interface SimulationModule {
   name: string
   enabled: boolean
-  simulate: (houseState: HouseState, timestepHours?: number) => HouseState
+  simulate: (houseState: HouseState, timestepHours?: number, config?: any) => HouseState
 }
 
 export interface ClimateData {

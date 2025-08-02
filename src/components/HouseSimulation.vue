@@ -234,6 +234,39 @@
                     </div>
                 </div>
 
+                <!-- Henri's Decision Engine Panel -->
+                <div class="decision-panel">
+                    <h3>🧠 Henri's Decision Engine</h3>
+                    <div class="decisions-grid">
+                        <div class="current-mode">
+                            <div class="mode-indicator" :class="simulationStore.currentMode">
+                                {{ getModeIcon(simulationStore.currentMode) }}
+                            </div>
+                            <div class="mode-text">
+                                <div class="mode-label">Current Mode</div>
+                                <div class="mode-value">{{ formatMode(simulationStore.currentMode) }}</div>
+                            </div>
+                        </div>
+                        <div class="recent-decisions">
+                            <div class="decisions-label">Recent Decisions</div>
+                            <div class="decisions-list">
+                                <div v-for="decision in simulationStore.recentDecisions.slice(-3)" :key="decision.timestamp" 
+                                     class="decision-item">
+                                    <span class="decision-time">{{ formatDecisionTime(decision.timestamp) }}</span>
+                                    <span class="decision-text">{{ decision.action }}</span>
+                                </div>
+                                <div v-if="simulationStore.recentDecisions.length === 0" class="no-decisions">
+                                    No adaptive actions yet
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div v-if="simulationStore.nextAdaptation" class="next-adaptation">
+                        <span class="adaptation-label">Next Adaptation:</span>
+                        <span class="adaptation-text">{{ simulationStore.nextAdaptation }}</span>
+                    </div>
+                </div>
+
                 <!-- Testing Panel -->
                 <div class="testing-panel">
                     <h3>🧪 Testing & Scenarios</h3>
@@ -369,6 +402,36 @@ const setTimeOfDay = (timeOfDay: string) => {
     const hour = timeMap[timeOfDay as keyof typeof timeMap] || 12
     simulationStore.setTime(hour)
 }
+
+// Decision Engine Formatters
+const getModeIcon = (mode: string) => {
+    const modeIcons = {
+        'normal': '🏠',
+        'emergency': '🚨', 
+        'energy-saving': '💡',
+        'comfort-priority': '😌',
+        'high-solar': '☀️',
+        'low-battery': '🔋'
+    }
+    return modeIcons[mode as keyof typeof modeIcons] || '🏠'
+}
+
+const formatMode = (mode: string) => {
+    const modeNames = {
+        'normal': 'Normal Operation',
+        'emergency': 'Emergency Response',
+        'energy-saving': 'Energy Conservation',
+        'comfort-priority': 'Comfort Priority',
+        'high-solar': 'High Solar Gain',
+        'low-battery': 'Low Battery Mode'
+    }
+    return modeNames[mode as keyof typeof modeNames] || 'Normal Operation'
+}
+
+const formatDecisionTime = (timestamp: number) => {
+    const hour = Math.floor(timestamp)
+    return `${hour.toString().padStart(2, '0')}:00`
+}
 </script>
 
 <style scoped>
@@ -496,7 +559,8 @@ const setTimeOfDay = (timeOfDay: string) => {
 
 .overview-panel,
 .modules-panel,
-.testing-panel {
+.testing-panel,
+.decision-panel {
     background: white;
     border-radius: 0.75rem;
     padding: 1rem;
@@ -506,11 +570,145 @@ const setTimeOfDay = (timeOfDay: string) => {
 
 .overview-panel h3,
 .modules-panel h3,
-.testing-panel h3 {
+.testing-panel h3,
+.decision-panel h3 {
     color: #111827;
     margin-bottom: 0.75rem;
     font-size: 1.125rem;
     font-weight: 700;
+}
+
+.decisions-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 1rem;
+    align-items: start;
+    margin-bottom: 0.75rem;
+}
+
+.current-mode {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem;
+    background: #f1f5f9;
+    border-radius: 0.5rem;
+    border: 1px solid #e2e8f0;
+}
+
+.mode-indicator {
+    font-size: 2rem;
+    min-width: 3rem;
+    text-align: center;
+    padding: 0.5rem;
+    border-radius: 0.5rem;
+    background: white;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.mode-indicator.emergency {
+    background: #fef2f2;
+    border: 2px solid #fca5a5;
+}
+
+.mode-indicator.energy-saving {
+    background: #f0fdf4;
+    border: 2px solid #86efac;
+}
+
+.mode-indicator.high-solar {
+    background: #fffbeb;
+    border: 2px solid #fcd34d;
+}
+
+.mode-text {
+    flex: 1;
+}
+
+.mode-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.mode-value {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.recent-decisions {
+    background: #f8fafc;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid #e2e8f0;
+}
+
+.decisions-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.decisions-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.decision-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.8rem;
+    padding: 0.25rem 0;
+}
+
+.decision-time {
+    color: #6b7280;
+    font-weight: 600;
+    min-width: 3rem;
+}
+
+.decision-text {
+    color: #374151;
+    font-weight: 500;
+    flex: 1;
+}
+
+.no-decisions {
+    font-size: 0.8rem;
+    color: #9ca3af;
+    font-style: italic;
+    text-align: center;
+    padding: 0.5rem 0;
+}
+
+.next-adaptation {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    background: #eff6ff;
+    border-radius: 0.5rem;
+    border: 1px solid #bfdbfe;
+    font-size: 0.8rem;
+}
+
+.adaptation-label {
+    color: #1e40af;
+    font-weight: 600;
+}
+
+.adaptation-text {
+    color: #1e3a8a;
+    font-weight: 500;
 }
 
 .metrics-grid {

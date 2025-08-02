@@ -56,6 +56,11 @@ export const useSimulationStore = defineStore('simulation', () => {
   const history = ref<HouseState[]>([])
   const modules = ref<SimulationModule[]>([])
 
+  // Henri's Decision Engine State
+  const currentMode = ref('normal')
+  const recentDecisions = ref<Array<{ timestamp: number; action: string; reason: string }>>([])
+  const nextAdaptation = ref<string | null>(null)
+
   // Module configurations
   const moduleConfigs = reactive<ModuleConfigs>({
     heatPump: {
@@ -110,6 +115,9 @@ export const useSimulationStore = defineStore('simulation', () => {
     // Save current state to history
     saveToHistory()
 
+    // Henri's adaptive analysis - analyze environment first
+    analyzeEnvironment()
+
     // Run enabled modules in sequence
     const enabledModules = modules.value.filter((m) => m.enabled)
 
@@ -128,6 +136,9 @@ export const useSimulationStore = defineStore('simulation', () => {
           if (Math.abs(tempDiff) > 0.1) {
             houseState.indoor.temperature = originalTemp + tempDiff * 0.1 // Gradual adjustment
           }
+        } else if (module.name === 'erv') {
+          // Pass ERV configuration for adaptive behavior
+          module.simulate(houseState, timestepHours, moduleConfigs.erv)
         } else {
           module.simulate(houseState, timestepHours)
         }
@@ -245,6 +256,134 @@ export const useSimulationStore = defineStore('simulation', () => {
     runSimulation()
   }
 
+  // Henri's Adaptive Decision Engine
+  const addDecision = (action: string, reason: string) => {
+    recentDecisions.value.push({
+      timestamp: houseState.time,
+      action,
+      reason
+    })
+    // Keep only last 10 decisions
+    if (recentDecisions.value.length > 10) {
+      recentDecisions.value.shift()
+    }
+  }
+
+  const analyzeEnvironment = () => {
+    // Reset next adaptation
+    nextAdaptation.value = null
+    
+    // Emergency mode - smoke event
+    if (houseState.safety.smokeEvent) {
+      if (currentMode.value !== 'emergency') {
+        currentMode.value = 'emergency'
+        addDecision('Emergency mode activated', 'Smoke event detected')
+        
+        // Activate sprinkler system
+        houseState.safety.sprinklersActive = true
+        addDecision('Sprinklers activated', 'Fire safety protocol')
+        
+        // Increase ERV flow rate for smoke evacuation
+        const ervModule = modules.value.find(m => m.name === 'erv')
+        if (ervModule?.enabled) {
+          moduleConfigs.erv.flowRate = 400 // Double flow rate
+          addDecision('ERV emergency ventilation', 'Evacuating contaminated air')
+        }
+      }
+      return
+    }
+
+    // High solar radiation adaptation
+    if (houseState.outdoor.solarRadiation > 700) {
+      if (currentMode.value !== 'high-solar') {
+        currentMode.value = 'high-solar'
+        addDecision('High solar mode activated', `Solar radiation: ${houseState.outdoor.solarRadiation}W/m²`)
+        
+        // Reduce heat pump efficiency due to solar heat gain
+        moduleConfigs.heatPump.efficiency = 2.8 // Reduced from 3.5
+        addDecision('Heat pump efficiency reduced', 'Compensating for solar heat gain')
+      }
+      
+      // Predict when to reduce solar impact
+      if (houseState.time < 16) {
+        nextAdaptation.value = 'Will reduce solar heat gain at peak (15:00)'
+      }
+    }
+
+    // Low battery adaptation  
+    const batteryPercent = (houseState.energy.batteryKWh / 20) * 100
+    if (batteryPercent < 20 && currentMode.value !== 'low-battery') {
+      currentMode.value = 'low-battery'
+      addDecision('Low battery mode activated', `Battery at ${Math.round(batteryPercent)}%`)
+      
+      // Reduce heat pump target temperature to conserve energy
+      moduleConfigs.heatPump.targetTemperature = Math.max(19, moduleConfigs.heatPump.targetTemperature - 1)
+      addDecision('Temperature setpoint lowered', 'Conserving battery energy')
+      
+      nextAdaptation.value = 'Will restore normal temperature when battery > 30%'
+    }
+
+    // Poor air quality adaptation
+    if (houseState.outdoor.airQualityIndex > 100) {
+      if (currentMode.value !== 'air-quality-protection') {
+        currentMode.value = 'air-quality-protection'
+        addDecision('Air quality protection mode', `Outdoor AQI: ${Math.round(houseState.outdoor.airQualityIndex)}`)
+        
+        // Reduce ERV flow rate to minimize outdoor air intake
+        moduleConfigs.erv.flowRate = Math.max(100, moduleConfigs.erv.flowRate * 0.6)
+        addDecision('ERV flow reduced', 'Limiting outdoor air intake')
+      }
+    }
+
+    // Comfort priority mode - when comfort score drops
+    if (houseState.comfortScore < 60 && currentMode.value !== 'comfort-priority') {
+      currentMode.value = 'comfort-priority'
+      addDecision('Comfort priority mode', `Comfort score: ${houseState.comfortScore}%`)
+      
+      // Boost heat pump efficiency
+      moduleConfigs.heatPump.efficiency = 4.0
+      addDecision('Heat pump efficiency boosted', 'Prioritizing occupant comfort')
+      
+      // Increase ERV efficiency
+      moduleConfigs.erv.efficiency = 0.8
+      addDecision('ERV efficiency increased', 'Improving air quality')
+      
+      nextAdaptation.value = 'Will return to normal when comfort > 80%'
+    }
+
+    // Return to normal mode conditions
+    if (currentMode.value !== 'normal') {
+      let shouldReturnToNormal = false
+      
+      if (currentMode.value === 'high-solar' && houseState.outdoor.solarRadiation < 500) {
+        shouldReturnToNormal = true
+        moduleConfigs.heatPump.efficiency = 3.5 // Restore normal efficiency
+      }
+      
+      if (currentMode.value === 'low-battery' && batteryPercent > 30) {
+        shouldReturnToNormal = true
+        moduleConfigs.heatPump.targetTemperature = 21 // Restore normal temperature
+      }
+      
+      if (currentMode.value === 'comfort-priority' && houseState.comfortScore > 80) {
+        shouldReturnToNormal = true
+        moduleConfigs.heatPump.efficiency = 3.5 // Restore normal efficiency
+        moduleConfigs.erv.efficiency = 0.7 // Restore normal efficiency
+      }
+      
+      if (currentMode.value === 'air-quality-protection' && houseState.outdoor.airQualityIndex < 75) {
+        shouldReturnToNormal = true
+        moduleConfigs.erv.flowRate = 200 // Restore normal flow rate
+      }
+      
+      if (shouldReturnToNormal) {
+        currentMode.value = 'normal'
+        addDecision('Normal operation restored', 'Environmental conditions normalized')
+        nextAdaptation.value = null
+      }
+    }
+  }
+
   return {
     // State
     houseState,
@@ -253,6 +392,11 @@ export const useSimulationStore = defineStore('simulation', () => {
     history,
     modules,
     moduleConfigs,
+    
+    // Henri's Decision Engine
+    currentMode,
+    recentDecisions,
+    nextAdaptation,
 
     // Getters
     currentHour,
@@ -271,6 +415,7 @@ export const useSimulationStore = defineStore('simulation', () => {
     updateModuleConfig,
     triggerSmokeEvent,
     clearSmokeEvent,
+    analyzeEnvironment,
   }
 })
 

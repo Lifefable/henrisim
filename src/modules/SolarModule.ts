@@ -5,7 +5,7 @@ import type { HouseState } from '@/types/simulation'
  * Generates solar energy based on solarRadiation and panelArea
  * Adds passive heat gain proportional to window area and orientation
  */
-export function simulateSolar(houseState: HouseState, timestepHours = 1): HouseState {
+export function simulateSolar(houseState: HouseState, timestepHours = 1, config?: any): HouseState {
   const { indoor, outdoor, envelope, energy } = houseState
 
   // Solar panel configuration
