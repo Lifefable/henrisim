@@ -5,7 +5,11 @@ import type { HouseState } from '@/types/simulation'
  * Calculates heat loss/gain and energy consumption
  * Adjusts indoor temperature toward target
  */
-export function simulateHeatPump(houseState: HouseState, timestepHours = 1, config?: any): HouseState {
+export function simulateHeatPump(
+  houseState: HouseState,
+  timestepHours = 1,
+  config?: any,
+): HouseState {
   const { indoor, outdoor, envelope, energy } = houseState
 
   // Get target temperature from module config (will be passed from store)

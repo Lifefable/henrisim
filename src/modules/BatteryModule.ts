@@ -5,7 +5,11 @@ import type { HouseState } from '@/types/simulation'
  * Stores excess solar energy and offsets grid energy use
  * Simple charge/discharge cycle per hour
  */
-export function simulateBattery(houseState: HouseState, timestepHours = 1, config?: any): HouseState {
+export function simulateBattery(
+  houseState: HouseState,
+  timestepHours = 1,
+  config?: any,
+): HouseState {
   const { energy } = houseState
 
   // Battery configuration

@@ -21,26 +21,30 @@ export function simulateERV(houseState: HouseState, timestepHours = 1, config?: 
     // In emergency mode, prioritize air evacuation over energy efficiency
     const emergencyFlowRate = ventilationRate * 2 // Double the flow rate
     const emergencyFanPower = fanPower * 1.5 // Increase fan power
-    
+
     // More aggressive air quality improvement in emergency
     const outdoorAQNormalized = Math.max(0.1, 1 - outdoor.airQualityIndex / 100) // Less conservative in emergency
-    const freshAirFraction = emergencyFlowRate / (envelope.floorArea * 2.5) / envelope.infiltrationRate
-    
+    const freshAirFraction =
+      emergencyFlowRate / (envelope.floorArea * 2.5) / envelope.infiltrationRate
+
     const airQualityImprovement = (outdoorAQNormalized - indoor.airQuality) * freshAirFraction * 0.2 // Double improvement rate
-    indoor.airQuality = Math.min(maxAirQuality, indoor.airQuality + airQualityImprovement * timestepHours)
-    
+    indoor.airQuality = Math.min(
+      maxAirQuality,
+      indoor.airQuality + airQualityImprovement * timestepHours,
+    )
+
     // Reduced thermal recovery in emergency mode (focus on air exchange)
     const tempDifference = outdoor.temperature - indoor.temperature
     const thermalRecovery = tempDifference * (ervEfficiency * 0.5) * 0.1 // Reduced efficiency
-    
+
     const thermalMass = envelope.floorArea * 0.3
     const temperatureChange = (thermalRecovery * timestepHours) / thermalMass
     indoor.temperature += temperatureChange
-    
+
     // Higher energy consumption in emergency
     const energyUsed = emergencyFanPower * timestepHours
     energy.ervKWh += energyUsed
-    
+
     return houseState
   }
 
@@ -51,13 +55,16 @@ export function simulateERV(houseState: HouseState, timestepHours = 1, config?: 
 
   // Air quality mixing calculation - adaptive based on outdoor conditions
   let airQualityImprovement = (outdoorAQNormalized - indoor.airQuality) * freshAirFraction * 0.1
-  
+
   // Reduce improvement rate if outdoor air quality is poor
   if (outdoor.airQualityIndex > 100) {
     airQualityImprovement *= 0.5 // Reduce by half when outdoor air is poor
   }
-  
-  indoor.airQuality = Math.min(maxAirQuality, indoor.airQuality + airQualityImprovement * timestepHours)
+
+  indoor.airQuality = Math.min(
+    maxAirQuality,
+    indoor.airQuality + airQualityImprovement * timestepHours,
+  )
 
   // Thermal recovery calculation - adaptive efficiency
   const tempDifference = outdoor.temperature - indoor.temperature
