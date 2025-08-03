@@ -114,145 +114,154 @@ const createDefaultThermalBridgesConfig = (): ThermalBridgesConfig => ({
   windows: 6, // W/K - Reduced from 12 (better installation)
 })
 
-export const useConfigurationStore = defineStore('configuration', () => {
-  // Configuration state
-  const building = reactive<BuildingConfig>(createDefaultBuildingConfig())
-  const hvac = reactive<HVACConfig>(createDefaultHVACConfig())
-  const buildingZones = reactive<BuildingZonesConfig>(createDefaultBuildingZonesConfig())
-  const thermalBridges = reactive<ThermalBridgesConfig>(createDefaultThermalBridgesConfig())
+export const useConfigurationStore = defineStore(
+  'configuration',
+  () => {
+    // Configuration state
+    const building = reactive<BuildingConfig>(createDefaultBuildingConfig())
+    const hvac = reactive<HVACConfig>(createDefaultHVACConfig())
+    const buildingZones = reactive<BuildingZonesConfig>(createDefaultBuildingZonesConfig())
+    const thermalBridges = reactive<ThermalBridgesConfig>(createDefaultThermalBridgesConfig())
 
-  // UI state
-  const isEditing = ref(false)
-  const hasUnsavedChanges = ref(false)
+    // UI state
+    const isEditing = ref(false)
+    const hasUnsavedChanges = ref(false)
 
-  // Validation ranges for parameters
-  const validationRanges = {
-    building: {
-      floorArea: { min: 50, max: 500, unit: 'm²' },
-      wallR: { min: 2.0, max: 10.0, unit: 'm²·K/W' },
-      roofR: { min: 3.0, max: 15.0, unit: 'm²·K/W' },
-      floorR: { min: 2.0, max: 8.0, unit: 'm²·K/W' },
-      windowU: { min: 0.4, max: 2.0, unit: 'W/m²·K' },
-      windowArea: { min: 5, max: 50, unit: 'm²' },
-      infiltrationRate: { min: 0.1, max: 1.0, unit: 'ACH' },
-      ceilingHeight: { min: 2.2, max: 3.5, unit: 'm' },
-    },
-    heatPump: {
-      capacity: { min: 1.0, max: 10.0, unit: 'kW' },
-      copHeating: { min: 2.0, max: 6.0, unit: '' },
-      copCooling: { min: 2.5, max: 7.0, unit: '' },
-      targetTempMin: { min: 16, max: 22, unit: '°C' },
-      targetTempMax: { min: 20, max: 26, unit: '°C' },
-    },
-    erv: {
-      flowRate: { min: 50, max: 300, unit: 'm³/h' },
-      efficiency: { min: 0.5, max: 0.95, unit: '%' },
-      fanPower: { min: 20, max: 150, unit: 'W' },
-    },
-    solar: {
-      panelArea: { min: 10, max: 100, unit: 'm²' },
-      panelEfficiency: { min: 0.15, max: 0.25, unit: '%' },
-      inverterEfficiency: { min: 0.9, max: 0.98, unit: '%' },
-      windowSHGC: { min: 0.2, max: 0.7, unit: '' },
-    },
-    battery: {
-      capacity: { min: 5, max: 50, unit: 'kWh' },
-      chargeRate: { min: 1.0, max: 10.0, unit: 'kW' },
-      dischargeRate: { min: 1.0, max: 10.0, unit: 'kW' },
-      efficiency: { min: 0.8, max: 0.98, unit: '%' },
-    },
-  }
-
-  // Calculated properties
-  const getVolume = () => building.floorArea * building.ceilingHeight
-  const getWindowToFloorRatio = () => (building.windowArea / building.floorArea) * 100
-  const getTotalInternalGains = () =>
-    buildingZones.occupancy * buildingZones.internalGains.people +
-    building.floorArea *
-      (buildingZones.internalGains.lighting + buildingZones.internalGains.equipment)
-  const getTotalThermalBridges = () =>
-    thermalBridges.foundation +
-    thermalBridges.balcony +
-    thermalBridges.roof +
-    thermalBridges.windows
-
-  // Validation functions
-  const validateValue = (category: string, field: string, value: number): boolean => {
-    const ranges = validationRanges as any
-    const range = ranges[category]?.[field]
-    if (!range) return true
-    return value >= range.min && value <= range.max
-  }
-
-  const getValidationMessage = (category: string, field: string): string => {
-    const ranges = validationRanges as any
-    const range = ranges[category]?.[field]
-    if (!range) return ''
-    return `Valid range: ${range.min} - ${range.max} ${range.unit}`
-  }
-
-  // Reset to defaults
-  const resetToDefaults = () => {
-    Object.assign(building, createDefaultBuildingConfig())
-    Object.assign(hvac, createDefaultHVACConfig())
-    Object.assign(buildingZones, createDefaultBuildingZonesConfig())
-    Object.assign(thermalBridges, createDefaultThermalBridgesConfig())
-    hasUnsavedChanges.value = false
-  }
-
-  // Load preset configurations
-  const loadPreset = (presetName: string) => {
-    switch (presetName) {
-      case 'minimal-ph':
-        // Minimal Passive House - just meets standards
-        building.wallR = 4.0
-        building.roofR = 6.0
-        building.windowU = 1.0
-        hvac.heatPump.capacity = 2.0
-        hvac.erv.efficiency = 0.75
-        break
-      case 'premium-ph':
-        // Premium Passive House - exceeds standards
-        building.wallR = 8.0
-        building.roofR = 12.0
-        building.windowU = 0.6
-        hvac.heatPump.capacity = 2.5
-        hvac.erv.efficiency = 0.85
-        break
-      case 'retrofit':
-        // Retrofit/EnerPHit standard
-        building.wallR = 3.0
-        building.roofR = 4.5
-        building.windowU = 1.2
-        building.infiltrationRate = 0.6
-        hvac.heatPump.capacity = 4.0
-        break
+    // Validation ranges for parameters
+    const validationRanges = {
+      building: {
+        floorArea: { min: 50, max: 500, unit: 'm²' },
+        wallR: { min: 2.0, max: 10.0, unit: 'm²·K/W' },
+        roofR: { min: 3.0, max: 15.0, unit: 'm²·K/W' },
+        floorR: { min: 2.0, max: 8.0, unit: 'm²·K/W' },
+        windowU: { min: 0.4, max: 2.0, unit: 'W/m²·K' },
+        windowArea: { min: 5, max: 50, unit: 'm²' },
+        infiltrationRate: { min: 0.1, max: 1.0, unit: 'ACH' },
+        ceilingHeight: { min: 2.2, max: 3.5, unit: 'm' },
+      },
+      heatPump: {
+        capacity: { min: 1.0, max: 10.0, unit: 'kW' },
+        copHeating: { min: 2.0, max: 6.0, unit: '' },
+        copCooling: { min: 2.5, max: 7.0, unit: '' },
+        targetTempMin: { min: 16, max: 22, unit: '°C' },
+        targetTempMax: { min: 20, max: 26, unit: '°C' },
+      },
+      erv: {
+        flowRate: { min: 50, max: 300, unit: 'm³/h' },
+        efficiency: { min: 0.5, max: 0.95, unit: '%' },
+        fanPower: { min: 20, max: 150, unit: 'W' },
+      },
+      solar: {
+        panelArea: { min: 10, max: 100, unit: 'm²' },
+        panelEfficiency: { min: 0.15, max: 0.25, unit: '%' },
+        inverterEfficiency: { min: 0.9, max: 0.98, unit: '%' },
+        windowSHGC: { min: 0.2, max: 0.7, unit: '' },
+      },
+      battery: {
+        capacity: { min: 5, max: 50, unit: 'kWh' },
+        chargeRate: { min: 1.0, max: 10.0, unit: 'kW' },
+        dischargeRate: { min: 1.0, max: 10.0, unit: 'kW' },
+        efficiency: { min: 0.8, max: 0.98, unit: '%' },
+      },
     }
-    hasUnsavedChanges.value = true
-  }
 
-  return {
-    // State
-    building,
-    hvac,
-    buildingZones,
-    thermalBridges,
-    isEditing,
-    hasUnsavedChanges,
+    // Calculated properties
+    const getVolume = () => building.floorArea * building.ceilingHeight
+    const getWindowToFloorRatio = () => (building.windowArea / building.floorArea) * 100
+    const getTotalInternalGains = () =>
+      buildingZones.occupancy * buildingZones.internalGains.people +
+      building.floorArea *
+        (buildingZones.internalGains.lighting + buildingZones.internalGains.equipment)
+    const getTotalThermalBridges = () =>
+      thermalBridges.foundation +
+      thermalBridges.balcony +
+      thermalBridges.roof +
+      thermalBridges.windows
 
-    // Computed
-    getVolume,
-    getWindowToFloorRatio,
-    getTotalInternalGains,
-    getTotalThermalBridges,
+    // Validation functions
+    const validateValue = (category: string, field: string, value: number): boolean => {
+      const ranges = validationRanges as any
+      const range = ranges[category]?.[field]
+      if (!range) return true
+      return value >= range.min && value <= range.max
+    }
 
-    // Validation
-    validateValue,
-    getValidationMessage,
-    validationRanges,
+    const getValidationMessage = (category: string, field: string): string => {
+      const ranges = validationRanges as any
+      const range = ranges[category]?.[field]
+      if (!range) return ''
+      return `Valid range: ${range.min} - ${range.max} ${range.unit}`
+    }
 
-    // Actions
-    resetToDefaults,
-    loadPreset,
-  }
-})
+    // Reset to defaults
+    const resetToDefaults = () => {
+      Object.assign(building, createDefaultBuildingConfig())
+      Object.assign(hvac, createDefaultHVACConfig())
+      Object.assign(buildingZones, createDefaultBuildingZonesConfig())
+      Object.assign(thermalBridges, createDefaultThermalBridgesConfig())
+      hasUnsavedChanges.value = false
+    }
+
+    // Load preset configurations
+    const loadPreset = (presetName: string) => {
+      switch (presetName) {
+        case 'minimal-ph':
+          // Minimal Passive House - just meets standards
+          building.wallR = 4.0
+          building.roofR = 6.0
+          building.windowU = 1.0
+          hvac.heatPump.capacity = 2.0
+          hvac.erv.efficiency = 0.75
+          break
+        case 'premium-ph':
+          // Premium Passive House - exceeds standards
+          building.wallR = 8.0
+          building.roofR = 12.0
+          building.windowU = 0.6
+          hvac.heatPump.capacity = 2.5
+          hvac.erv.efficiency = 0.85
+          break
+        case 'retrofit':
+          // Retrofit/EnerPHit standard
+          building.wallR = 3.0
+          building.roofR = 4.5
+          building.windowU = 1.2
+          building.infiltrationRate = 0.6
+          hvac.heatPump.capacity = 4.0
+          break
+      }
+      hasUnsavedChanges.value = true
+    }
+
+    return {
+      // State
+      building,
+      hvac,
+      buildingZones,
+      thermalBridges,
+      isEditing,
+      hasUnsavedChanges,
+
+      // Computed
+      getVolume,
+      getWindowToFloorRatio,
+      getTotalInternalGains,
+      getTotalThermalBridges,
+
+      // Validation
+      validateValue,
+      getValidationMessage,
+      validationRanges,
+
+      // Actions
+      resetToDefaults,
+      loadPreset,
+    }
+  },
+  {
+    persist: {
+      key: 'henri-configuration',
+      storage: localStorage,
+    },
+  },
+)
