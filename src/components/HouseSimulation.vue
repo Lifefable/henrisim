@@ -129,7 +129,7 @@
                             <div class="metric-content">
                                 <div class="metric-label">Battery</div>
                                 <div class="metric-value">{{ formatEnergy(simulationStore.houseState.energy.batteryKWh)
-                                }}</div>
+                                    }}</div>
                                 <div class="metric-subtitle">{{ getBatteryPercentage() }}% charged</div>
                             </div>
                         </div>
@@ -183,7 +183,7 @@
                                 <div class="module-stat">
                                     <span>Target Temp:</span>
                                     <span>{{ formatTemperature(simulationStore.moduleConfigs.heatPump.targetTemperature)
-                                    }}</span>
+                                        }}</span>
                                 </div>
                                 <div class="module-stat">
                                     <span>COP:</span>
@@ -437,6 +437,11 @@
                     </div>
                 </div>
 
+                <!-- Henri Comparison Panel -->
+                <div class="henri-comparison-section">
+                    <HenriComparisonPanel />
+                </div>
+
                 <!-- Safety Panel -->
                 <div v-if="simulationStore.houseState.safety.smokeEvent || simulationStore.houseState.safety.sprinklersActive"
                     class="safety-panel alert">
@@ -471,7 +476,7 @@
                                 <div class="scenario-details">
                                     <span class="scenario-name">{{ simulationStore.activeTestScenario.name }}</span>
                                     <span class="scenario-description">{{ simulationStore.activeTestScenario.description
-                                    }}</span>
+                                        }}</span>
                                 </div>
                             </div>
                             <BaseButton @click="simulationStore.clearTestScenario()" variant="secondary" size="sm">
@@ -559,6 +564,7 @@ import { createSolarModule } from '@/modules/SolarModule'
 import { createBatteryModule } from '@/modules/BatteryModule'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import EnergyBalanceChart from '@/components/EnergyBalanceChart.vue'
+import HenriComparisonPanel from '@/components/HenriComparisonPanel.vue'
 
 const simulationStore = useSimulationStore()
 
@@ -1158,6 +1164,11 @@ watch(() => [
 
 /* Ensure energy balance spans full width */
 .energy-balance-section {
+    grid-column: 1 / -1;
+}
+
+/* Ensure Henri comparison spans full width */
+.henri-comparison-section {
     grid-column: 1 / -1;
 }
 

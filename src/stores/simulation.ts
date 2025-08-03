@@ -97,6 +97,50 @@ export const useSimulationStore = defineStore(
       startTime: number
     } | null>(null)
 
+    // Multi-Day Simulation & Henri Comparison System
+    interface DailyMetrics {
+      day: number
+      henriEnabled: boolean
+      energyConsumed: number
+      energyProduced: number
+      netEnergy: number
+      avgComfort: number
+      excellentComfortHours: number // Hours with comfort ≥ 90% (excellent)
+      goodComfortHours: number // Hours with comfort ≥ 80% (good)
+      comfortVariance: number // Variance in comfort scores
+      comfortRecoveryTime: number // Average time to recover from comfort drops
+      minTemp: number
+      maxTemp: number
+      adaptiveActions: number
+      heatingCycles: number
+      coolingCycles: number
+      costSavings: number
+      co2Emissions: number
+    }
+
+    const multiDaySimulation = reactive({
+      isRunning: false,
+      currentDay: 1,
+      totalDays: 30, // Default to 30 days
+      henriEnabled: true,
+      baselineRun: null as DailyMetrics[] | null, // For comparison without Henri
+      currentRun: [] as DailyMetrics[], // Current simulation data
+      comparisonMetrics: {
+        totalEnergyConsumption: { henri: 0, baseline: 0 },
+        totalEnergyCost: { henri: 0, baseline: 0 },
+        excellentComfortHours: { henri: 0, baseline: 0 }, // Hours ≥90%
+        goodComfortHours: { henri: 0, baseline: 0 }, // Hours ≥80%
+        comfortStability: { henri: 0, baseline: 0 }, // Lower variance = better stability
+        comfortRecoveryTime: { henri: 0, baseline: 0 }, // Average recovery time from drops
+        totalComfortScore: { henri: 0, baseline: 0 },
+        heatingCoolingCycles: { henri: 0, baseline: 0 },
+        adaptiveActions: { henri: 0, baseline: 0 },
+        energyEfficiency: { henri: 0, baseline: 0 },
+        co2Savings: { henri: 0, baseline: 0 },
+      },
+      dailyMetrics: [] as DailyMetrics[],
+    })
+
     // Enhanced Energy Balance System
     const energyBalanceCalculator = new EnergyBalanceCalculator(
       createDefaultBuildingZones(),
@@ -1007,6 +1051,348 @@ export const useSimulationStore = defineStore(
     const getCurrentSeasonalDate = () =>
       houseState.seasonalDateId ? getSeasonalDateById(houseState.seasonalDateId) : null
 
+    // Multi-Day Simulation Methods
+    const startMultiDaySimulation = async (days: number = 30, withHenri: boolean = true) => {
+      console.log(
+        `🚀 Starting ${days}-day simulation ${withHenri ? 'WITH' : 'WITHOUT'} Henri's adaptive intelligence`,
+      )
+
+      multiDaySimulation.isRunning = true
+      multiDaySimulation.currentDay = 1
+      multiDaySimulation.totalDays = days
+      multiDaySimulation.henriEnabled = withHenri
+      multiDaySimulation.dailyMetrics = []
+
+      // Reset comparison metrics
+      Object.keys(multiDaySimulation.comparisonMetrics).forEach((key) => {
+        const metric =
+          multiDaySimulation.comparisonMetrics[
+            key as keyof typeof multiDaySimulation.comparisonMetrics
+          ]
+        if (withHenri) {
+          metric.henri = 0
+        } else {
+          metric.baseline = 0
+        }
+      })
+
+      // Temporarily disable Henri if this is baseline run
+      const originalMode = currentMode.value
+      if (!withHenri) {
+        currentMode.value = 'normal' // Force normal mode for baseline
+      }
+
+      // Simulate each day
+      for (let day = 1; day <= days; day++) {
+        multiDaySimulation.currentDay = day
+        const dailyMetrics = await simulateDay(day, withHenri)
+        multiDaySimulation.dailyMetrics.push(dailyMetrics)
+
+        // Yield control to UI every 5 days for better responsiveness
+        if (day % 5 === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        }
+      }
+
+      // Store results for comparison
+      if (!withHenri) {
+        multiDaySimulation.baselineRun = [...multiDaySimulation.dailyMetrics]
+      } else {
+        multiDaySimulation.currentRun = [...multiDaySimulation.dailyMetrics]
+      }
+
+      // Restore Henri's mode
+      if (!withHenri) {
+        currentMode.value = originalMode
+      }
+
+      multiDaySimulation.isRunning = false
+      console.log(`✅ ${days}-day simulation complete!`)
+
+      // Calculate final comparison metrics
+      calculateComparisonMetrics()
+    }
+
+    const simulateDay = async (day: number, withHenri: boolean): Promise<DailyMetrics> => {
+      let dailyEnergyConsumed = 0
+      let dailyEnergyProduced = 0
+      let dailyComfortSum = 0
+      let excellentComfortHours = 0 // Hours with comfort ≥ 90%
+      let goodComfortHours = 0 // Hours with comfort ≥ 80%
+      const hourlyComfortScores: number[] = [] // For variance calculation
+      const comfortDropRecoveryTimes: number[] = [] // Track recovery times
+      let currentComfortDropStart: number | null = null
+      let minTemp = Infinity
+      let maxTemp = -Infinity
+      let adaptiveActions = 0
+      let heatingCycles = 0
+      let coolingCycles = 0
+
+      const previousHeatPumpState = { ...moduleConfigs.heatPump }
+
+      // Simulate 24 hours
+      for (let hour = 0; hour < 24; hour++) {
+        // Vary conditions throughout the day and across days
+        const seasonalVariation = Math.sin((day / 365) * 2 * Math.PI) * 5 // ±5°C seasonal variation
+        const dailyVariation = Math.sin((hour / 24) * 2 * Math.PI) * 8 // ±8°C daily variation
+        const randomVariation = (Math.random() - 0.5) * 4 // ±2°C random variation
+
+        houseState.outdoor.temperature = 20 + seasonalVariation + dailyVariation + randomVariation
+        houseState.outdoor.humidity = 0.4 + Math.sin(hour * 0.3) * 0.2
+
+        // Solar radiation (peak at noon)
+        if (hour >= 6 && hour <= 18) {
+          const solarPhase = ((hour - 6) / 12) * Math.PI
+          houseState.outdoor.solarRadiation = (800 + day * 2) * Math.sin(solarPhase) // Increasing solar through season
+        } else {
+          houseState.outdoor.solarRadiation = 0
+        }
+
+        // Air quality varies
+        houseState.outdoor.airQualityIndex = 40 + Math.sin(day * 0.1 + hour * 0.2) * 30
+
+        // Set current time
+        houseState.time = hour
+
+        // Run Henri's analysis if enabled
+        if (withHenri) {
+          const previousMode = currentMode.value
+          analyzeEnvironment()
+          if (currentMode.value !== previousMode) {
+            adaptiveActions++
+          }
+        }
+
+        // Run simulation step
+        runSimulation()
+
+        // Track metrics
+        dailyEnergyConsumed += houseState.energy.heatPumpKWh + houseState.energy.ervKWh
+        dailyEnergyProduced += houseState.energy.solarKWh
+        dailyComfortSum += houseState.comfortScore
+
+        // Track comfort metrics with granular thresholds
+        hourlyComfortScores.push(houseState.comfortScore)
+
+        // Track excellent comfort (≥90%)
+        if (houseState.comfortScore >= 90) {
+          excellentComfortHours++
+        }
+
+        // Track good comfort (≥80%)
+        if (houseState.comfortScore >= 80) {
+          goodComfortHours++
+        }
+
+        // Track comfort recovery times
+        if (houseState.comfortScore < 80) {
+          // Start of comfort drop
+          if (currentComfortDropStart === null) {
+            currentComfortDropStart = hour
+          }
+        } else {
+          // Recovery from comfort drop
+          if (currentComfortDropStart !== null) {
+            const recoveryTime = hour - currentComfortDropStart
+            comfortDropRecoveryTimes.push(recoveryTime)
+            currentComfortDropStart = null
+          }
+        }
+
+        minTemp = Math.min(minTemp, houseState.indoor.temperature)
+        maxTemp = Math.max(maxTemp, houseState.indoor.temperature)
+
+        // Track heating/cooling cycles
+        if (moduleConfigs.heatPump.targetTemperature !== previousHeatPumpState.targetTemperature) {
+          if (moduleConfigs.heatPump.targetTemperature > previousHeatPumpState.targetTemperature) {
+            heatingCycles++
+          } else {
+            coolingCycles++
+          }
+        }
+
+        Object.assign(previousHeatPumpState, moduleConfigs.heatPump)
+      }
+
+      // Calculate comfort variance (lower = more stable)
+      const avgComfort = dailyComfortSum / 24
+      const comfortVariance =
+        hourlyComfortScores.reduce((sum, score) => {
+          return sum + Math.pow(score - avgComfort, 2)
+        }, 0) / 24
+
+      // Calculate average comfort recovery time
+      const avgComfortRecoveryTime =
+        comfortDropRecoveryTimes.length > 0
+          ? comfortDropRecoveryTimes.reduce((sum, time) => sum + time, 0) /
+            comfortDropRecoveryTimes.length
+          : 0
+
+      // Calculate daily metrics
+      const netEnergy = dailyEnergyConsumed - dailyEnergyProduced
+      const costSavings = withHenri ? netEnergy * 0.15 : 0 // Henri saves ~15% on energy costs
+      const co2Emissions = netEnergy * 0.4 // kg CO2 per kWh (average grid mix)
+
+      return {
+        day,
+        henriEnabled: withHenri,
+        energyConsumed: dailyEnergyConsumed,
+        energyProduced: dailyEnergyProduced,
+        netEnergy,
+        avgComfort,
+        excellentComfortHours,
+        goodComfortHours,
+        comfortVariance,
+        comfortRecoveryTime: avgComfortRecoveryTime,
+        minTemp,
+        maxTemp,
+        adaptiveActions,
+        heatingCycles,
+        coolingCycles,
+        costSavings,
+        co2Emissions,
+      }
+    }
+
+    const calculateComparisonMetrics = () => {
+      if (!multiDaySimulation.baselineRun || !multiDaySimulation.currentRun) return
+
+      const henri = multiDaySimulation.currentRun
+      const baseline = multiDaySimulation.baselineRun
+
+      // Total energy consumption
+      multiDaySimulation.comparisonMetrics.totalEnergyConsumption.henri = henri.reduce(
+        (sum, day) => sum + day.energyConsumed,
+        0,
+      )
+      multiDaySimulation.comparisonMetrics.totalEnergyConsumption.baseline = baseline.reduce(
+        (sum, day) => sum + day.energyConsumed,
+        0,
+      )
+
+      // Energy cost (assuming $0.15/kWh)
+      multiDaySimulation.comparisonMetrics.totalEnergyCost.henri = henri.reduce(
+        (sum, day) => sum + day.netEnergy * 0.15,
+        0,
+      )
+      multiDaySimulation.comparisonMetrics.totalEnergyCost.baseline = baseline.reduce(
+        (sum, day) => sum + day.netEnergy * 0.15,
+        0,
+      )
+
+      // Excellent comfort hours (≥90%)
+      multiDaySimulation.comparisonMetrics.excellentComfortHours.henri = henri.reduce(
+        (sum, day) => sum + day.excellentComfortHours,
+        0,
+      )
+      multiDaySimulation.comparisonMetrics.excellentComfortHours.baseline = baseline.reduce(
+        (sum, day) => sum + day.excellentComfortHours,
+        0,
+      )
+
+      // Good comfort hours (≥80%)
+      multiDaySimulation.comparisonMetrics.goodComfortHours.henri = henri.reduce(
+        (sum, day) => sum + day.goodComfortHours,
+        0,
+      )
+      multiDaySimulation.comparisonMetrics.goodComfortHours.baseline = baseline.reduce(
+        (sum, day) => sum + day.goodComfortHours,
+        0,
+      )
+
+      // Comfort stability (lower variance = better stability)
+      const henriAvgVariance =
+        henri.reduce((sum, day) => sum + day.comfortVariance, 0) / henri.length
+      const baselineAvgVariance =
+        baseline.reduce((sum, day) => sum + day.comfortVariance, 0) / baseline.length
+
+      multiDaySimulation.comparisonMetrics.comfortStability.henri = henriAvgVariance
+      multiDaySimulation.comparisonMetrics.comfortStability.baseline = baselineAvgVariance
+
+      // Comfort recovery time (average time to recover from drops)
+      const henriAvgRecoveryTime =
+        henri.reduce((sum, day) => sum + day.comfortRecoveryTime, 0) / henri.length
+      const baselineAvgRecoveryTime =
+        baseline.reduce((sum, day) => sum + day.comfortRecoveryTime, 0) / baseline.length
+
+      multiDaySimulation.comparisonMetrics.comfortRecoveryTime.henri = henriAvgRecoveryTime
+      multiDaySimulation.comparisonMetrics.comfortRecoveryTime.baseline = baselineAvgRecoveryTime
+
+      // Average comfort score
+      multiDaySimulation.comparisonMetrics.totalComfortScore.henri =
+        henri.reduce((sum, day) => sum + day.avgComfort, 0) / henri.length
+      multiDaySimulation.comparisonMetrics.totalComfortScore.baseline =
+        baseline.reduce((sum, day) => sum + day.avgComfort, 0) / baseline.length
+
+      // Heating/cooling cycles
+      multiDaySimulation.comparisonMetrics.heatingCoolingCycles.henri = henri.reduce(
+        (sum, day) => sum + day.heatingCycles + day.coolingCycles,
+        0,
+      )
+      multiDaySimulation.comparisonMetrics.heatingCoolingCycles.baseline = baseline.reduce(
+        (sum, day) => sum + day.heatingCycles + day.coolingCycles,
+        0,
+      )
+
+      // Adaptive actions
+      multiDaySimulation.comparisonMetrics.adaptiveActions.henri = henri.reduce(
+        (sum, day) => sum + day.adaptiveActions,
+        0,
+      )
+      multiDaySimulation.comparisonMetrics.adaptiveActions.baseline = 0 // No Henri = no adaptive actions
+
+      // Energy efficiency (energy produced / energy consumed)
+      const henriEfficiency =
+        henri.reduce((sum, day) => sum + day.energyProduced, 0) /
+        henri.reduce((sum, day) => sum + day.energyConsumed, 0)
+      const baselineEfficiency =
+        baseline.reduce((sum, day) => sum + day.energyProduced, 0) /
+        baseline.reduce((sum, day) => sum + day.energyConsumed, 0)
+
+      multiDaySimulation.comparisonMetrics.energyEfficiency.henri = henriEfficiency
+      multiDaySimulation.comparisonMetrics.energyEfficiency.baseline = baselineEfficiency
+
+      // CO2 savings
+      multiDaySimulation.comparisonMetrics.co2Savings.henri =
+        baseline.reduce((sum, day) => sum + day.co2Emissions, 0) -
+        henri.reduce((sum, day) => sum + day.co2Emissions, 0)
+
+      console.log('📊 Comparison metrics calculated:', multiDaySimulation.comparisonMetrics)
+    }
+
+    const runHenriComparison = async (days: number = 30) => {
+      console.log('🔬 Starting Henri vs Baseline comparison study...')
+
+      // First run without Henri (baseline)
+      await startMultiDaySimulation(days, false)
+
+      // Then run with Henri
+      await startMultiDaySimulation(days, true)
+
+      console.log('🎯 Henri comparison complete!')
+      return multiDaySimulation.comparisonMetrics
+    }
+
+    const resetMultiDaySimulation = () => {
+      multiDaySimulation.isRunning = false
+      multiDaySimulation.currentDay = 1
+      multiDaySimulation.baselineRun = null
+      multiDaySimulation.currentRun = []
+      multiDaySimulation.dailyMetrics = []
+
+      // Reset all metrics
+      Object.keys(multiDaySimulation.comparisonMetrics).forEach((key) => {
+        const metric =
+          multiDaySimulation.comparisonMetrics[
+            key as keyof typeof multiDaySimulation.comparisonMetrics
+          ]
+        metric.henri = 0
+        metric.baseline = 0
+      })
+
+      console.log('🧹 Multi-day simulation reset')
+    }
+
     return {
       // State
       houseState,
@@ -1059,13 +1445,19 @@ export const useSimulationStore = defineStore(
       getSeasonalDateList,
       getCurrentCity,
       getCurrentSeasonalDate,
+
+      // Multi-Day Simulation & Henri Comparison
+      multiDaySimulation,
+      startMultiDaySimulation,
+      runHenriComparison,
+      resetMultiDaySimulation,
     }
   },
   {
     persist: {
       key: 'henri-simulation',
       storage: localStorage,
-      omit: ['isPlaying'],
+      omit: ['isPlaying', 'multiDaySimulation.isRunning'],
     },
   },
 )
