@@ -96,6 +96,7 @@ export interface SolarConfig {
   efficiency: number // 0-1
   orientation: number // degrees from south
   tilt: number // degrees from horizontal
+  inverterEfficiency: number // 0-1
 }
 
 export interface BatteryConfig {
@@ -103,6 +104,7 @@ export interface BatteryConfig {
   chargeRate: number // kW
   dischargeRate: number // kW
   currentCharge: number // kWh
+  efficiency: number // round-trip efficiency (0-1)
 }
 
 export interface ModuleConfigs {

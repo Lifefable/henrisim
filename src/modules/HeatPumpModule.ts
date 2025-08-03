@@ -15,7 +15,7 @@ export function simulateHeatPump(
   // Get target temperature from module config (passed from store)
   const targetTemp = config?.targetTemperature || 21
   const heatPumpCOP = config?.efficiency || 3.5 // Use adaptive COP from store
-  const heatPumpCapacity = 18 // kW maximum capacity - increased for better control
+  const heatPumpCapacity = config?.capacity || 3 // kW capacity from configuration store
 
   // Calculate required heating/cooling to reach target
   const tempDifference = targetTemp - indoor.temperature

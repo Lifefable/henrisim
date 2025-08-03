@@ -13,12 +13,244 @@
       <!-- Configuration Section -->
       <section class="configuration">
         <div class="config-header">
-          <h2>⚙️ System Configuration</h2>
+          <h2>System Configuration</h2>
           <div class="config-controls">
-            <button @click="toggleEditMode" :class="['config-button', { active: configStore.isEditing }]">
-              {{ configStore.isEditing ? '💾 Save Changes' : '✏️ Edit Configuration' }}
+            <button 
+              class="config-button"
+              :class="{ active: configStore.isEditing }"
+              @click="toggleEditMode"
+            >
+              {{ configStore.isEditing ? '💾 Save Changes' : '⚙️ Edit Configuration' }}
             </button>
-            <button v-if="configStore.isEditing" class="config-button secondary" @click="resetToDefaults">
+     }
+
+  .building-specs {
+    grid-template-columns: 1fr;
+  }
+
+  .config-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .calc-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Configuration Section Styles */
+.configuration {
+  background: #f8fafc;
+  border-radius: 1rem;
+  padding: 2rem;
+  margin: 2rem 0;
+  border: 2px solid #e5e7eb;
+}
+
+.config-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.config-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.config-button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.875rem;
+}
+
+.config-button:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.config-button.active {
+  background: #059669;
+}
+
+.config-button.secondary {
+  background: #6b7280;
+}
+
+.config-button.secondary:hover {
+  background: #4b5563;
+}
+
+.preset-select {
+  padding: 0.5rem;
+  border: 2px solid #d1d5db;
+  border-radius: 0.375rem;
+  background: white;
+  font-size: 0.875rem;
+}
+
+.config-section {
+  background: white;
+  border-radius: 0.75rem;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  border: 1px solid #e5e7eb;
+}
+
+.config-section h3 {
+  color: #1f2937;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+}
+
+.config-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.config-item label {
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.875rem;
+}
+
+.config-item input {
+  padding: 0.75rem;
+  border: 2px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 1rem;
+  transition: border-color 0.2s;
+}
+
+.config-item input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.config-value {
+  padding: 0.75rem;
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.375rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.config-hint {
+  color: #6b7280;
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+.calculated-values {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.calculated-values h4 {
+  color: #1f2937;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.calc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.calc-item {
+  background: #f3f4f6;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  border-left: 4px solid #3b82f6;
+}
+
+.config-summary {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  padding: 2rem;
+  border: 2px solid #e5e7eb;
+  margin-top: 2rem;
+}
+
+.config-summary h4 {
+  color: #1f2937;
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: 1.5rem;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.summary-item {
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  border-left: 4px solid;
+}
+
+.summary-item.excellent {
+  background: #f0fdf4;
+  border-left-color: #16a34a;
+  color: #15803d;
+}
+
+.summary-item.good {
+  background: #fefce8;
+  border-left-color: #ca8a04;
+  color: #a16207;
+}
+
+.summary-item.standard {
+  background: #fff7ed;
+  border-left-color: #ea580c;
+  color: #c2410c;
+}
+
+.summary-item.poor {
+  background: #fef2f2;
+  border-left-color: #dc2626;
+  color: #b91c1c;
+}
+</style>
+
+<button 
+              v-if="configStore.isEditing"
+              class="config-button secondary"
+              @click="resetToDefaults"
+            >
               🔄 Reset to Defaults
             </button>
             <div v-if="configStore.isEditing" class="preset-selector">
@@ -26,61 +258,101 @@
                 <option value="">Load Preset...</option>
                 <option value="minimal-ph">Minimal Passive House</option>
                 <option value="premium-ph">Premium Passive House</option>
-                <option value="retrofit">Retrofit/EnerPHit</option>
+                <option value="retrofit">EnerPHit Retrofit</option>
               </select>
             </div>
           </div>
         </div>
 
-        <!-- Building Envelope Configuration -->
-        <div v-if="configStore.isEditing" class="config-section">
+        <!-- Building Envelope -->
+        <div class="config-section">
           <h3>🏠 Building Envelope</h3>
           <div class="config-grid">
             <div class="config-item">
               <label>Floor Area (m²)</label>
-              <input v-model.number="configStore.building.floorArea" type="number"
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="configStore.building.floorArea" 
+                type="number" 
                 :min="configStore.validationRanges.building.floorArea.min"
-                :max="configStore.validationRanges.building.floorArea.max" @input="onConfigChange" />
+                :max="configStore.validationRanges.building.floorArea.max"
+                @input="onConfigChange"
+              />
+              <span v-else class="config-value">{{ configStore.building.floorArea }} m²</span>
               <small class="config-hint">{{ configStore.getValidationMessage('building', 'floorArea') }}</small>
             </div>
 
             <div class="config-item">
               <label>Wall R-Value (m²·K/W)</label>
-              <input v-model.number="configStore.building.wallR" type="number" step="0.1"
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="configStore.building.wallR" 
+                type="number" 
+                step="0.5"
                 :min="configStore.validationRanges.building.wallR.min"
-                :max="configStore.validationRanges.building.wallR.max" @input="onConfigChange" />
+                :max="configStore.validationRanges.building.wallR.max"
+                @input="onConfigChange"
+              />
+              <span v-else class="config-value">R-{{ configStore.building.wallR }}</span>
               <small class="config-hint">{{ configStore.getValidationMessage('building', 'wallR') }}</small>
             </div>
 
             <div class="config-item">
               <label>Roof R-Value (m²·K/W)</label>
-              <input v-model.number="configStore.building.roofR" type="number" step="0.1"
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="configStore.building.roofR" 
+                type="number" 
+                step="0.5"
                 :min="configStore.validationRanges.building.roofR.min"
-                :max="configStore.validationRanges.building.roofR.max" @input="onConfigChange" />
+                :max="configStore.validationRanges.building.roofR.max"
+                @input="onConfigChange"
+              />
+              <span v-else class="config-value">R-{{ configStore.building.roofR }}</span>
               <small class="config-hint">{{ configStore.getValidationMessage('building', 'roofR') }}</small>
             </div>
 
             <div class="config-item">
               <label>Window U-Value (W/m²·K)</label>
-              <input v-model.number="configStore.building.windowU" type="number" step="0.1"
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="configStore.building.windowU" 
+                type="number" 
+                step="0.1"
                 :min="configStore.validationRanges.building.windowU.min"
-                :max="configStore.validationRanges.building.windowU.max" @input="onConfigChange" />
+                :max="configStore.validationRanges.building.windowU.max"
+                @input="onConfigChange"
+              />
+              <span v-else class="config-value">{{ configStore.building.windowU }} W/m²·K</span>
               <small class="config-hint">{{ configStore.getValidationMessage('building', 'windowU') }}</small>
             </div>
 
             <div class="config-item">
               <label>Window Area (m²)</label>
-              <input v-model.number="configStore.building.windowArea" type="number"
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="configStore.building.windowArea" 
+                type="number" 
                 :min="configStore.validationRanges.building.windowArea.min"
-                :max="configStore.validationRanges.building.windowArea.max" @input="onConfigChange" />
+                :max="configStore.validationRanges.building.windowArea.max"
+                @input="onConfigChange"
+              />
+              <span v-else class="config-value">{{ configStore.building.windowArea }} m²</span>
               <small class="config-hint">{{ configStore.getValidationMessage('building', 'windowArea') }}</small>
             </div>
 
             <div class="config-item">
-              <label>Air Leakage (ACH)</label>
-              <input v-model.number="configStore.building.infiltrationRate" type="number" step="0.1"
+              <label>Air Infiltration (ACH)</label>
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="configStore.building.infiltrationRate" 
+                type="number" 
+                step="0.1"
                 :min="configStore.validationRanges.building.infiltrationRate.min"
-                :max="configStore.validationRanges.building.infiltrationRate.max" @input="onConfigChange" />
+                :max="configStore.validationRanges.building.infiltrationRate.max"
+                @input="onConfigChange"
+              />
+              <span v-else class="config-value">{{ configStore.building.infiltrationRate }} ACH</span>
               <small class="config-hint">{{ configStore.getValidationMessage('building', 'infiltrationRate') }}</small>
             </div>
           </div>
@@ -98,151 +370,246 @@
           </div>
         </div>
 
-        <!-- HVAC System Configuration -->
-        <div v-if="configStore.isEditing" class="config-section">
+        <!-- HVAC Systems -->
+        <div class="config-section">
           <h3>🔥 Heat Pump System</h3>
           <div class="config-grid">
             <div class="config-item">
               <label>Capacity (kW)</label>
-              <input v-model.number="configStore.hvac.heatPump.capacity" type="number" step="0.1"
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="configStore.hvac.heatPump.capacity" 
+                type="number" 
+                step="0.5"
                 :min="configStore.validationRanges.heatPump.capacity.min"
-                :max="configStore.validationRanges.heatPump.capacity.max" @input="onConfigChange" />
+                :max="configStore.validationRanges.heatPump.capacity.max"
+                @input="onConfigChange"
+              />
+              <span v-else class="config-value">{{ configStore.hvac.heatPump.capacity }} kW</span>
               <small class="config-hint">{{ configStore.getValidationMessage('heatPump', 'capacity') }}</small>
             </div>
 
             <div class="config-item">
               <label>COP Heating</label>
-              <input v-model.number="configStore.hvac.heatPump.copHeating" type="number" step="0.1"
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="configStore.hvac.heatPump.copHeating" 
+                type="number" 
+                step="0.1"
                 :min="configStore.validationRanges.heatPump.copHeating.min"
-                :max="configStore.validationRanges.heatPump.copHeating.max" @input="onConfigChange" />
+                :max="configStore.validationRanges.heatPump.copHeating.max"
+                @input="onConfigChange"
+              />
+              <span v-else class="config-value">{{ configStore.hvac.heatPump.copHeating }}</span>
               <small class="config-hint">{{ configStore.getValidationMessage('heatPump', 'copHeating') }}</small>
             </div>
 
             <div class="config-item">
               <label>COP Cooling</label>
-              <input v-model.number="configStore.hvac.heatPump.copCooling" type="number" step="0.1"
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="configStore.hvac.heatPump.copCooling" 
+                type="number" 
+                step="0.1"
                 :min="configStore.validationRanges.heatPump.copCooling.min"
-                :max="configStore.validationRanges.heatPump.copCooling.max" @input="onConfigChange" />
+                :max="configStore.validationRanges.heatPump.copCooling.max"
+                @input="onConfigChange"
+              />
+              <span v-else class="config-value">{{ configStore.hvac.heatPump.copCooling }}</span>
               <small class="config-hint">{{ configStore.getValidationMessage('heatPump', 'copCooling') }}</small>
             </div>
           </div>
         </div>
 
-        <!-- ERV System Configuration -->
-        <div v-if="configStore.isEditing" class="config-section">
-          <h3>💨 ERV System</h3>
+        <div class="config-section">
+          <h3>💨 Energy Recovery Ventilation</h3>
           <div class="config-grid">
             <div class="config-item">
               <label>Flow Rate (m³/h)</label>
-              <input v-model.number="configStore.hvac.erv.flowRate" type="number"
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="configStore.hvac.erv.flowRate" 
+                type="number" 
                 :min="configStore.validationRanges.erv.flowRate.min"
-                :max="configStore.validationRanges.erv.flowRate.max" @input="onConfigChange" />
+                :max="configStore.validationRanges.erv.flowRate.max"
+                @input="onConfigChange"
+              />
+              <span v-else class="config-value">{{ configStore.hvac.erv.flowRate }} m³/h</span>
               <small class="config-hint">{{ configStore.getValidationMessage('erv', 'flowRate') }}</small>
             </div>
 
             <div class="config-item">
               <label>Heat Recovery Efficiency (%)</label>
-              <input v-model.number="ervEfficiencyPercent" type="number" min="50" max="95"
-                @input="onERVEfficiencyChange" />
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="ervEfficiencyPercent" 
+                type="number" 
+                min="50"
+                max="95"
+                @input="onERVEfficiencyChange"
+              />
+              <span v-else class="config-value">{{ (configStore.hvac.erv.efficiency * 100).toFixed(0) }}%</span>
               <small class="config-hint">{{ configStore.getValidationMessage('erv', 'efficiency') }}</small>
             </div>
 
             <div class="config-item">
               <label>Fan Power (W)</label>
-              <input v-model.number="configStore.hvac.erv.fanPower" type="number"
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="configStore.hvac.erv.fanPower" 
+                type="number" 
                 :min="configStore.validationRanges.erv.fanPower.min"
-                :max="configStore.validationRanges.erv.fanPower.max" @input="onConfigChange" />
+                :max="configStore.validationRanges.erv.fanPower.max"
+                @input="onConfigChange"
+              />
+              <span v-else class="config-value">{{ configStore.hvac.erv.fanPower }} W</span>
               <small class="config-hint">{{ configStore.getValidationMessage('erv', 'fanPower') }}</small>
+            </div>
+          </div>
+
+          <div class="calculated-values">
+            <h4>📊 Calculated Values</h4>
+            <div class="calc-grid">
+              <div class="calc-item">
+                <strong>Air Changes per Hour:</strong> {{ (configStore.hvac.erv.flowRate / configStore.getVolume()).toFixed(2) }} ACH
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Solar System Configuration -->
-        <div v-if="configStore.isEditing" class="config-section">
+        <div class="config-section">
           <h3>☀️ Solar System</h3>
           <div class="config-grid">
             <div class="config-item">
               <label>Panel Area (m²)</label>
-              <input v-model.number="configStore.hvac.solar.panelArea" type="number"
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="configStore.hvac.solar.panelArea" 
+                type="number" 
                 :min="configStore.validationRanges.solar.panelArea.min"
-                :max="configStore.validationRanges.solar.panelArea.max" @input="onConfigChange" />
+                :max="configStore.validationRanges.solar.panelArea.max"
+                @input="onConfigChange"
+              />
+              <span v-else class="config-value">{{ configStore.hvac.solar.panelArea }} m²</span>
               <small class="config-hint">{{ configStore.getValidationMessage('solar', 'panelArea') }}</small>
             </div>
 
             <div class="config-item">
               <label>Panel Efficiency (%)</label>
-              <input v-model.number="solarEfficiencyPercent" type="number" min="15" max="25"
-                @input="onSolarEfficiencyChange" />
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="solarEfficiencyPercent" 
+                type="number" 
+                min="15"
+                max="25"
+                @input="onSolarEfficiencyChange"
+              />
+              <span v-else class="config-value">{{ (configStore.hvac.solar.panelEfficiency * 100).toFixed(0) }}%</span>
               <small class="config-hint">{{ configStore.getValidationMessage('solar', 'panelEfficiency') }}</small>
             </div>
 
             <div class="config-item">
               <label>Inverter Efficiency (%)</label>
-              <input v-model.number="inverterEfficiencyPercent" type="number" min="90" max="98"
-                @input="onInverterEfficiencyChange" />
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="inverterEfficiencyPercent" 
+                type="number" 
+                min="90"
+                max="98"
+                @input="onInverterEfficiencyChange"
+              />
+              <span v-else class="config-value">{{ (configStore.hvac.solar.inverterEfficiency * 100).toFixed(0) }}%</span>
               <small class="config-hint">{{ configStore.getValidationMessage('solar', 'inverterEfficiency') }}</small>
+            </div>
+          </div>
+
+          <div class="calculated-values">
+            <h4>📊 Calculated Values</h4>
+            <div class="calc-grid">
+              <div class="calc-item">
+                <strong>Peak Power:</strong> {{ (configStore.hvac.solar.panelArea * configStore.hvac.solar.panelEfficiency * 1).toFixed(1) }} kWp
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Battery System Configuration -->
-        <div v-if="configStore.isEditing" class="config-section">
-          <h3>🔋 Battery System</h3>
+        <div class="config-section">
+          <h3>🔋 Battery Storage</h3>
           <div class="config-grid">
             <div class="config-item">
               <label>Capacity (kWh)</label>
-              <input v-model.number="configStore.hvac.battery.capacity" type="number"
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="configStore.hvac.battery.capacity" 
+                type="number" 
                 :min="configStore.validationRanges.battery.capacity.min"
-                :max="configStore.validationRanges.battery.capacity.max" @input="onConfigChange" />
+                :max="configStore.validationRanges.battery.capacity.max"
+                @input="onConfigChange"
+              />
+              <span v-else class="config-value">{{ configStore.hvac.battery.capacity }} kWh</span>
               <small class="config-hint">{{ configStore.getValidationMessage('battery', 'capacity') }}</small>
             </div>
 
             <div class="config-item">
               <label>Charge Rate (kW)</label>
-              <input v-model.number="configStore.hvac.battery.chargeRate" type="number" step="0.1"
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="configStore.hvac.battery.chargeRate" 
+                type="number" 
+                step="0.5"
                 :min="configStore.validationRanges.battery.chargeRate.min"
-                :max="configStore.validationRanges.battery.chargeRate.max" @input="onConfigChange" />
+                :max="configStore.validationRanges.battery.chargeRate.max"
+                @input="onConfigChange"
+              />
+              <span v-else class="config-value">{{ configStore.hvac.battery.chargeRate }} kW</span>
               <small class="config-hint">{{ configStore.getValidationMessage('battery', 'chargeRate') }}</small>
             </div>
 
             <div class="config-item">
               <label>Round-trip Efficiency (%)</label>
-              <input v-model.number="batteryEfficiencyPercent" type="number" min="80" max="98"
-                @input="onBatteryEfficiencyChange" />
+              <input 
+                v-if="configStore.isEditing" 
+                v-model.number="batteryEfficiencyPercent" 
+                type="number" 
+                min="80"
+                max="98"
+                @input="onBatteryEfficiencyChange"
+              />
+              <span v-else class="config-value">{{ (configStore.hvac.battery.efficiency * 100).toFixed(0) }}%</span>
               <small class="config-hint">{{ configStore.getValidationMessage('battery', 'efficiency') }}</small>
             </div>
           </div>
         </div>
 
-        <!-- Performance Summary -->
-        <div class="config-summary">
-          <h4>📈 Current System Performance Assessment</h4>
+        <!-- Configuration Summary -->
+        <div v-if="!configStore.isEditing" class="config-summary">
+          <h4>🎯 Passive House Performance Summary</h4>
           <div class="summary-grid">
-            <div :class="['summary-item', getPerformanceClass('envelope')]">
-              <strong>Building Envelope:</strong><br>
-              {{ getBuildingPerformance() }}
+            <div class="summary-item" :class="getPerformanceClass('envelope')">
+              <strong>Building Envelope:</strong> 
+              <span>{{ getBuildingPerformance() }}</span>
             </div>
-            <div :class="['summary-item', getPerformanceClass('hvac')]">
-              <strong>HVAC Sizing:</strong><br>
-              {{ getHVACPerformance() }}
+            <div class="summary-item" :class="getPerformanceClass('hvac')">
+              <strong>HVAC Sizing:</strong> 
+              <span>{{ getHVACPerformance() }}</span>
             </div>
-            <div :class="['summary-item', getPerformanceClass('renewable')]">
-              <strong>Renewable Energy:</strong><br>
-              {{ getRenewablePerformance() }}
+            <div class="summary-item" :class="getPerformanceClass('renewable')">
+              <strong>Renewable Energy:</strong> 
+              <span>{{ getRenewablePerformance() }}</span>
             </div>
           </div>
         </div>
       </section>
 
       <section class="modules">
-        <h2>Current System Specifications</h2>
+        <h2>Simulation Modules</h2>
 
         <div class="module-grid">
           <div class="module-info">
             <h3>🔥 Heat Pump System</h3>
             <p>
               The primary heating and cooling system with configurable capacity and efficiency.
-              Current settings: {{ configStore.hvac.heatPump.capacity }}kW capacity with
+              Current settings: {{ configStore.hvac.heatPump.capacity }}kW capacity with 
               COP of {{ configStore.hvac.heatPump.copHeating }} for heating.
             </p>
           </div>
@@ -251,7 +618,7 @@
             <h3>💨 Energy Recovery Ventilation (ERV)</h3>
             <p>
               Provides fresh outdoor air while recovering thermal energy from outgoing air.
-              Current settings: {{ configStore.hvac.erv.flowRate }}m³/h flow rate with
+              Current settings: {{ configStore.hvac.erv.flowRate }}m³/h flow rate with 
               {{ (configStore.hvac.erv.efficiency * 100).toFixed(0) }}% heat recovery efficiency.
             </p>
           </div>
@@ -260,7 +627,7 @@
             <h3>☀️ Solar Panel System</h3>
             <p>
               {{ configStore.hvac.solar.panelArea }}m² of solar panels generate clean electricity during daylight hours.
-              {{ (configStore.hvac.solar.panelEfficiency * 100).toFixed(0) }}% panel efficiency with
+              {{ (configStore.hvac.solar.panelEfficiency * 100).toFixed(0) }}% panel efficiency with 
               {{ (configStore.hvac.solar.inverterEfficiency * 100).toFixed(0) }}% inverter efficiency.
             </p>
           </div>
@@ -268,7 +635,7 @@
           <div class="module-info">
             <h3>🔋 Battery Storage</h3>
             <p>
-              {{ configStore.hvac.battery.capacity }}kWh battery system stores excess solar energy
+              {{ configStore.hvac.battery.capacity }}kWh battery system stores excess solar energy 
               with {{ (configStore.hvac.battery.efficiency * 100).toFixed(0) }}% round-trip efficiency.
               Charge/discharge rate: {{ configStore.hvac.battery.chargeRate }}kW.
             </p>
@@ -289,12 +656,10 @@
             <strong>Roof Insulation:</strong> R-{{ configStore.building.roofR }} m²·K/W
           </div>
           <div class="spec-item">
-            <strong>Windows:</strong> {{ configStore.building.windowArea }} m² with U-value of {{
-              configStore.building.windowU }} W/m²·K
+            <strong>Windows:</strong> {{ configStore.building.windowArea }} m² with U-value of {{ configStore.building.windowU }} W/m²·K
           </div>
           <div class="spec-item">
-            <strong>Air Leakage:</strong> {{ configStore.building.infiltrationRate }} ACH ({{ getAirtightnessRating()
-            }})
+            <strong>Air Leakage:</strong> {{ configStore.building.infiltrationRate }} ACH ({{ getAirtightnessRating() }})
           </div>
           <div class="spec-item">
             <strong>Volume:</strong> {{ configStore.getVolume().toFixed(0) }} m³
@@ -307,7 +672,7 @@
         <p>
           The simulation features <strong>enhanced climate modeling</strong> with support for multiple cities
           and seasonal variations. Choose from 9 global locations and 4 key seasonal dates to explore
-          passive house performance across different climates.
+          passive house performance across different climates:
         </p>
 
         <div class="climate-features">
@@ -376,9 +741,9 @@
           <li>Try the <strong>preset times</strong> (morning, noon, evening) for quick scenarios</li>
           <li>Trigger a <strong>smoke event</strong> to see safety system responses</li>
           <li>Watch how <strong>energy flows</strong> change throughout the day</li>
-          <li><strong>Edit configuration</strong> in this page to explore different building designs</li>
         </ol>
       </section>
+
 
     </div>
   </div>
@@ -470,7 +835,7 @@ const getBuildingPerformance = () => {
   const wallR = configStore.building.wallR
   const windowU = configStore.building.windowU
   const infiltration = configStore.building.infiltrationRate
-
+  
   if (wallR >= 5.0 && windowU <= 0.8 && infiltration <= 0.6) {
     return 'Excellent Passive House Standard'
   } else if (wallR >= 4.0 && windowU <= 1.0 && infiltration <= 1.0) {
@@ -486,7 +851,7 @@ const getHVACPerformance = () => {
   const heatPumpCapacity = configStore.hvac.heatPump.capacity
   const floorArea = configStore.building.floorArea
   const capacityPerArea = heatPumpCapacity / floorArea * 1000 // W/m²
-
+  
   if (capacityPerArea <= 15) {
     return 'Properly Sized for Passive House'
   } else if (capacityPerArea <= 25) {
@@ -502,7 +867,7 @@ const getRenewablePerformance = () => {
   const solarArea = configStore.hvac.solar.panelArea
   const floorArea = configStore.building.floorArea
   const solarRatio = solarArea / floorArea
-
+  
   if (solarRatio >= 0.3) {
     return 'Excellent Solar Coverage'
   } else if (solarRatio >= 0.2) {
@@ -523,7 +888,7 @@ const getPerformanceClass = (category: string) => {
   } else if (category === 'renewable') {
     performance = getRenewablePerformance()
   }
-
+  
   if (performance.includes('Excellent') || performance.includes('Properly')) {
     return 'excellent'
   } else if (performance.includes('Good') || performance.includes('Acceptable')) {
@@ -639,6 +1004,22 @@ section {
   font-weight: 700;
 }
 
+.tech-stack {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+.tech-item {
+  background: #3b82f6;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 2rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
 ul,
 ol {
   color: #374151;
@@ -680,201 +1061,6 @@ p {
   padding-left: 0.5rem;
 }
 
-/* Configuration Section Styles */
-.configuration {
-  background: #f8fafc;
-  border-radius: 1rem;
-  padding: 2rem;
-  margin: 2rem 0;
-  border: 2px solid #e5e7eb;
-}
-
-.config-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.config-controls {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-  flex-wrap: wrap;
-}
-
-.config-button {
-  background: #3b82f6;
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 0.5rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 0.875rem;
-}
-
-.config-button:hover {
-  background: #2563eb;
-  transform: translateY(-1px);
-}
-
-.config-button.active {
-  background: #059669;
-}
-
-.config-button.secondary {
-  background: #6b7280;
-}
-
-.config-button.secondary:hover {
-  background: #4b5563;
-}
-
-.preset-select {
-  padding: 0.5rem;
-  border: 2px solid #d1d5db;
-  border-radius: 0.375rem;
-  background: white;
-  font-size: 0.875rem;
-}
-
-.config-section {
-  background: white;
-  border-radius: 0.75rem;
-  padding: 2rem;
-  margin-bottom: 2rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  border: 1px solid #e5e7eb;
-}
-
-.config-section h3 {
-  color: #1f2937;
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.config-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
-}
-
-.config-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.config-item label {
-  font-weight: 600;
-  color: #374151;
-  font-size: 0.875rem;
-}
-
-.config-item input {
-  padding: 0.75rem;
-  border: 2px solid #d1d5db;
-  border-radius: 0.375rem;
-  font-size: 1rem;
-  transition: border-color 0.2s;
-}
-
-.config-item input:focus {
-  outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.config-hint {
-  color: #6b7280;
-  font-size: 0.75rem;
-  font-style: italic;
-}
-
-.calculated-values {
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #e5e7eb;
-}
-
-.calculated-values h4 {
-  color: #1f2937;
-  font-size: 1rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-}
-
-.calc-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.calc-item {
-  background: #f3f4f6;
-  padding: 1rem;
-  border-radius: 0.5rem;
-  border-left: 4px solid #3b82f6;
-}
-
-.config-summary {
-  background: #ffffff;
-  border-radius: 0.75rem;
-  padding: 2rem;
-  border: 2px solid #e5e7eb;
-  margin-top: 2rem;
-}
-
-.config-summary h4 {
-  color: #1f2937;
-  font-size: 1.125rem;
-  font-weight: 600;
-  margin-bottom: 1.5rem;
-}
-
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-}
-
-.summary-item {
-  padding: 1.5rem;
-  border-radius: 0.5rem;
-  border-left: 4px solid;
-}
-
-.summary-item.excellent {
-  background: #f0fdf4;
-  border-left-color: #16a34a;
-  color: #15803d;
-}
-
-.summary-item.good {
-  background: #fefce8;
-  border-left-color: #ca8a04;
-  color: #a16207;
-}
-
-.summary-item.standard {
-  background: #fff7ed;
-  border-left-color: #ea580c;
-  color: #c2410c;
-}
-
-.summary-item.poor {
-  background: #fef2f2;
-  border-left-color: #dc2626;
-  color: #b91c1c;
-}
-
 @media (max-width: 768px) {
   .about {
     padding: 1rem;
@@ -898,18 +1084,6 @@ p {
   }
 
   .building-specs {
-    grid-template-columns: 1fr;
-  }
-
-  .config-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .calc-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .summary-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -14,9 +14,10 @@ import {
   createDefaultBuildingZones,
   createDefaultThermalBridges,
 } from '@/utils/energy-balance'
+import { useConfigurationStore } from './configuration'
 
-// Default house state
-const createDefaultHouseState = (): HouseState => ({
+// Default house state factory - will be updated to use configuration store
+const createDefaultHouseState = (configStore?: any): HouseState => ({
   time: 12, // Start at noon
   date: '2024-06-21', // Summer solstice
   location: {
@@ -43,20 +44,20 @@ const createDefaultHouseState = (): HouseState => ({
   },
 
   envelope: {
-    floorArea: 150, // m²
-    wallR: 5.0, // m²*K/W
-    roofR: 7.0,
-    floorR: 4.0,
-    windowU: 0.8, // W/m²*K
-    windowArea: 20, // m²
-    infiltrationRate: 0.3, // ACH
+    floorArea: configStore?.building.floorArea || 150, // m²
+    wallR: configStore?.building.wallR || 5.0, // m²*K/W
+    roofR: configStore?.building.roofR || 7.0,
+    floorR: configStore?.building.floorR || 4.0,
+    windowU: configStore?.building.windowU || 0.8, // W/m²*K
+    windowArea: configStore?.building.windowArea || 20, // m²
+    infiltrationRate: configStore?.building.infiltrationRate || 0.3, // ACH
   },
 
   energy: {
     heatPumpKWh: 0,
     ervKWh: 0,
     solarKWh: 0,
-    batteryKWh: 5, // Start with some initial charge (25% of 20kWh capacity)
+    batteryKWh: configStore?.hvac.battery.capacity * 0.25 || 5, // Start with 25% charge
     netKWh: 0,
   },
 
@@ -69,8 +70,11 @@ const createDefaultHouseState = (): HouseState => ({
 })
 
 export const useSimulationStore = defineStore('simulation', () => {
-  // State
-  const houseState = reactive<HouseState>(createDefaultHouseState())
+  // Get configuration store
+  const configStore = useConfigurationStore()
+
+  // State - initialize with configuration values
+  const houseState = reactive<HouseState>(createDefaultHouseState(configStore))
   const isPlaying = ref(false)
   const playbackSpeed = ref(1) // 1x, 2x, 4x speed
   const history = ref<HouseState[]>([])
@@ -98,20 +102,54 @@ export const useSimulationStore = defineStore('simulation', () => {
   )
   const currentEnergyBalance = ref<EnergyBalanceComponents | null>(null)
 
-  // Module configurations
+  // Module configurations - now pulls from configuration store
   const moduleConfigs = reactive<ModuleConfigs>({
     heatPump: {
-      targetTemperature: 21,
-      efficiency: 3.5, // COP
-      capacity: 12, // kW
+      targetTemperature: 21, // This will be user-adjustable in UI
+      efficiency: configStore.hvac.heatPump.copHeating,
+      capacity: configStore.hvac.heatPump.capacity,
     },
     erv: {
       enabled: true,
-      efficiency: 0.7, // 70% heat recovery
-      flowRate: 200, // m³/h
-      fanPower: 150, // W
+      efficiency: configStore.hvac.erv.efficiency,
+      flowRate: configStore.hvac.erv.flowRate,
+      fanPower: configStore.hvac.erv.fanPower,
+    },
+    solar: {
+      panelArea: configStore.hvac.solar.panelArea,
+      efficiency: configStore.hvac.solar.panelEfficiency,
+      orientation: 180, // South-facing
+      tilt: 30, // Optimal tilt angle
+      inverterEfficiency: configStore.hvac.solar.inverterEfficiency,
+    },
+    battery: {
+      capacity: configStore.hvac.battery.capacity,
+      chargeRate: configStore.hvac.battery.chargeRate,
+      dischargeRate: configStore.hvac.battery.dischargeRate,
+      currentCharge: configStore.hvac.battery.capacity * 0.25, // Start at 25%
+      efficiency: configStore.hvac.battery.efficiency,
     },
   })
+
+  // Watch for configuration changes and update module configs
+  const syncConfigChanges = () => {
+    moduleConfigs.heatPump.efficiency = configStore.hvac.heatPump.copHeating
+    moduleConfigs.heatPump.capacity = configStore.hvac.heatPump.capacity
+    moduleConfigs.erv.efficiency = configStore.hvac.erv.efficiency
+    moduleConfigs.erv.flowRate = configStore.hvac.erv.flowRate
+    moduleConfigs.erv.fanPower = configStore.hvac.erv.fanPower
+    if (moduleConfigs.solar) {
+      moduleConfigs.solar.panelArea = configStore.hvac.solar.panelArea
+      moduleConfigs.solar.efficiency = configStore.hvac.solar.panelEfficiency
+      moduleConfigs.solar.inverterEfficiency = configStore.hvac.solar.inverterEfficiency
+    }
+    if (moduleConfigs.battery) {
+      moduleConfigs.battery.capacity = configStore.hvac.battery.capacity
+      moduleConfigs.battery.chargeRate = configStore.hvac.battery.chargeRate
+      moduleConfigs.battery.dischargeRate = configStore.hvac.battery.dischargeRate
+      moduleConfigs.battery.efficiency = configStore.hvac.battery.efficiency
+    }
+  }
 
   // Getters
   const currentHour = computed(() => houseState.time)
@@ -548,9 +586,39 @@ export const useSimulationStore = defineStore('simulation', () => {
       playbackTimer = null
     }
 
-    // Reset the state
-    Object.assign(houseState, createDefaultHouseState())
+    // Reset the state with current configuration
+    Object.assign(houseState, createDefaultHouseState(configStore))
     history.value = []
+
+    // Sync module configurations
+    syncConfigChanges()
+  }
+
+  // Configuration management functions
+  const updateFromConfiguration = () => {
+    // Update building envelope from configuration
+    houseState.envelope.floorArea = configStore.building.floorArea
+    houseState.envelope.wallR = configStore.building.wallR
+    houseState.envelope.roofR = configStore.building.roofR
+    houseState.envelope.floorR = configStore.building.floorR
+    houseState.envelope.windowU = configStore.building.windowU
+    houseState.envelope.windowArea = configStore.building.windowArea
+    houseState.envelope.infiltrationRate = configStore.building.infiltrationRate
+
+    // Update module configurations
+    syncConfigChanges()
+
+    // Re-run simulation with new parameters
+    runSimulation()
+  }
+
+  const refreshFromConfiguration = () => {
+    // Called when user makes changes in configuration UI
+    updateFromConfiguration()
+
+    // Note: Energy balance calculator doesn't have update methods,
+    // so we just re-run the simulation with new parameters
+    runSimulation()
   }
 
   const updateModuleConfig = (moduleName: keyof ModuleConfigs, config: unknown) => {
@@ -574,16 +642,57 @@ export const useSimulationStore = defineStore('simulation', () => {
   // Henri's Adaptive Decision Engine
   const decisionIdCounter = ref(0)
   const addDecision = (action: string, reason: string) => {
-    recentDecisions.value.push({
-      id: decisionIdCounter.value++,
+    const decision = {
+      id: Date.now(),
       timestamp: houseState.time,
       action,
       reason,
-    })
-    // Keep only last 10 decisions
-    if (recentDecisions.value.length > 10) {
-      recentDecisions.value.shift()
     }
+    recentDecisions.value.push(decision)
+
+    // Keep only the last 10 decisions
+    if (recentDecisions.value.length > 10) {
+      recentDecisions.value = recentDecisions.value.slice(-10)
+    }
+  }
+
+  // Manual mode override for UI control
+  const setManualMode = (modeId: string) => {
+    currentMode.value = modeId
+    addDecision('Manual mode override', `User selected ${modeId} mode`)
+
+    // Apply the mode configurations immediately
+    switch (modeId) {
+      case 'normal':
+        moduleConfigs.heatPump.targetTemperature = 21
+        moduleConfigs.heatPump.efficiency = 3.5
+        moduleConfigs.erv.flowRate = 200
+        moduleConfigs.erv.efficiency = 0.7
+        break
+      case 'comfort-priority':
+        moduleConfigs.heatPump.efficiency = 4.2
+        moduleConfigs.erv.efficiency = 0.8
+        break
+      case 'low-battery':
+        moduleConfigs.heatPump.targetTemperature = Math.max(
+          20,
+          moduleConfigs.heatPump.targetTemperature - 1,
+        )
+        moduleConfigs.heatPump.efficiency = Math.min(4.5, moduleConfigs.heatPump.efficiency * 1.2)
+        break
+      case 'high-solar':
+        moduleConfigs.heatPump.efficiency = 2.8
+        break
+      case 'air-quality-protection':
+        moduleConfigs.erv.flowRate = Math.max(100, moduleConfigs.erv.flowRate * 0.6)
+        break
+    }
+
+    // Update next adaptation message
+    nextAdaptation.value = 'Manual mode active - automatic adaptation disabled'
+
+    // Run simulation to apply changes
+    runSimulation()
   }
 
   const analyzeEnvironment = () => {
@@ -930,6 +1039,12 @@ export const useSimulationStore = defineStore('simulation', () => {
     analyzeEnvironment,
     triggerTestScenario,
     clearTestScenario,
+    setManualMode,
+
+    // Configuration management
+    updateFromConfiguration,
+    refreshFromConfiguration,
+    syncConfigChanges,
 
     // New climate actions
     setCity,

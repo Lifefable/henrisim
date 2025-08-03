@@ -20,6 +20,31 @@
                 </div>
             </div>
 
+            <!-- Location and Season Controls in Header -->
+            <div class="header-controls">
+                <div class="location-controls">
+                    <div class="control-group">
+                        <label class="control-label">🏙️ City:</label>
+                        <select :value="simulationStore.houseState.location.cityId || 'denver'"
+                            @change="handleCityChange" class="header-selector">
+                            <option v-for="city in simulationStore.getCityList()" :key="city.id" :value="city.id">
+                                {{ city.name }}, {{ city.country }}
+                            </option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label class="control-label">📆 Season:</label>
+                        <select :value="simulationStore.houseState.seasonalDateId || 'summer-solstice'"
+                            @change="handleSeasonChange" class="header-selector">
+                            <option v-for="seasonalDate in simulationStore.getSeasonalDateList()" :key="seasonalDate.id"
+                                :value="seasonalDate.id">
+                                {{ seasonalDate.name }}
+                            </option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
             <div class="time-control-panel">
                 <div class="time-slider-container">
                     <input type="range" min="0" max="23" step="1" v-model.number="timeSlider" class="time-slider" />
@@ -38,6 +63,9 @@
                     </BaseButton>
                     <BaseButton @click="togglePlayback" :variant="simulationStore.isPlaying ? 'danger' : 'primary'">
                         {{ simulationStore.isPlaying ? 'Pause' : 'Play' }}
+                    </BaseButton>
+                    <BaseButton @click="showTestScenariosModal = true" variant="secondary" size="sm">
+                        Test Scenarios
                     </BaseButton>
                 </div>
             </div>
@@ -101,7 +129,7 @@
                             <div class="metric-content">
                                 <div class="metric-label">Battery</div>
                                 <div class="metric-value">{{ formatEnergy(simulationStore.houseState.energy.batteryKWh)
-                                    }}</div>
+                                }}</div>
                                 <div class="metric-subtitle">{{ getBatteryPercentage() }}% charged</div>
                             </div>
                         </div>
@@ -155,7 +183,7 @@
                                 <div class="module-stat">
                                     <span>Target Temp:</span>
                                     <span>{{ formatTemperature(simulationStore.moduleConfigs.heatPump.targetTemperature)
-                                        }}</span>
+                                    }}</span>
                                 </div>
                                 <div class="module-stat">
                                     <span>COP:</span>
@@ -263,195 +291,55 @@
                 <!-- Henri's Decision Engine Panel -->
                 <div class="decision-panel">
                     <h3>🧠 Henri's Decision Engine</h3>
-                    <div class="decisions-grid">
-                        <div class="current-mode">
-                            <div class="mode-indicator" :class="simulationStore.currentMode">
-                                {{ getModeIcon(simulationStore.currentMode) }}
-                            </div>
-                            <div class="mode-text">
-                                <div class="mode-label">Current Mode</div>
-                                <div class="mode-value">{{ formatMode(simulationStore.currentMode) }}</div>
-                            </div>
-                        </div>
-                        <div class="recent-decisions">
-                            <div class="decisions-label">Recent Decisions</div>
-                            <div class="decisions-list">
-                                <div v-for="decision in simulationStore.recentDecisions.slice(-3)" :key="decision.id"
-                                    class="decision-item">
-                                    <span class="decision-time">{{ formatDecisionTime(decision.timestamp) }}</span>
-                                    <span class="decision-text">{{ decision.action }}</span>
-                                </div>
-                                <div v-if="simulationStore.recentDecisions.length === 0" class="no-decisions">
-                                    No adaptive actions yet
+
+                    <!-- All Modes Display -->
+                    <div class="modes-section">
+                        <div class="modes-label">Available Modes</div>
+                        <div class="modes-grid">
+                            <div v-for="mode in allModes" :key="mode.id" class="mode-card" :class="{
+                                'active': simulationStore.currentMode === mode.id,
+                                'clickable': mode.id !== 'emergency'
+                            }" @click="handleModeClick(mode.id)" @mouseenter="handleModeHover(mode.id)"
+                                @mouseleave="handleModeLeave()">
+                                <div class="mode-icon">{{ mode.icon }}</div>
+                                <div class="mode-name">{{ mode.name }}</div>
+                                <div v-if="simulationStore.currentMode === mode.id" class="active-indicator">ACTIVE
                                 </div>
                             </div>
                         </div>
                     </div>
+
+                    <!-- Recent Decisions -->
+                    <div class="recent-decisions">
+                        <div class="decisions-label">Recent Decisions</div>
+                        <div class="decisions-list">
+                            <div v-for="decision in simulationStore.recentDecisions.slice(-3)" :key="decision.id"
+                                class="decision-item">
+                                <span class="decision-time">{{ formatDecisionTime(decision.timestamp) }}</span>
+                                <span class="decision-text">{{ decision.action }}</span>
+                            </div>
+                            <div v-if="simulationStore.recentDecisions.length === 0" class="no-decisions">
+                                No adaptive actions yet
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Mode Explanation -->
+                    <div class="mode-explanation" :class="{ 'preview-mode': hoveredModeId }">
+                        <div class="explanation-label">
+                            {{ hoveredModeId ? 'Hover Preview' : 'Current Mode Behavior' }}
+                        </div>
+                        <div class="explanation-text">{{ getCurrentModeExplanation() }}</div>
+                    </div>
+
                     <div v-if="simulationStore.nextAdaptation" class="next-adaptation">
                         <span class="adaptation-label">Next Adaptation:</span>
                         <span class="adaptation-text">{{ simulationStore.nextAdaptation }}</span>
                     </div>
                 </div>
 
-                <!-- Testing Panel -->
+                <!-- Debug Data Table -->
                 <div class="testing-panel">
-                    <h3>🧪 Testing & Scenarios</h3>
-
-                    <!-- Active Test Scenario Display -->
-                    <div v-if="simulationStore.activeTestScenario" class="active-scenario-panel">
-                        <div class="scenario-header">
-                            <div class="scenario-info">
-                                <h4>🔬 Active Test Scenario</h4>
-                                <div class="scenario-details">
-                                    <span class="scenario-name">{{ simulationStore.activeTestScenario.name }}</span>
-                                    <span class="scenario-description">{{ simulationStore.activeTestScenario.description
-                                    }}</span>
-                                </div>
-                            </div>
-                            <BaseButton @click="simulationStore.clearTestScenario()" variant="secondary" size="sm">
-                                ❌ Clear Scenario
-                            </BaseButton>
-                        </div>
-                    </div>
-
-                    <!-- Environmental Test Scenarios -->
-                    <div class="test-section">
-                        <h4>🌡️ Environmental Tests</h4>
-                        <div class="testing-controls">
-                            <BaseButton @click="simulationStore.triggerTestScenario('heatWave')" variant="danger"
-                                size="sm">
-                                🔥 Heat Wave
-                            </BaseButton>
-                            <BaseButton @click="simulationStore.triggerTestScenario('coldSnap')" variant="primary"
-                                size="sm">
-                                🥶 Cold Snap
-                            </BaseButton>
-                            <BaseButton @click="simulationStore.triggerTestScenario('poorAirQuality')"
-                                variant="secondary" size="sm">
-                                💨 Poor Air Quality
-                            </BaseButton>
-                        </div>
-                    </div>
-
-                    <!-- Energy Test Scenarios -->
-                    <div class="test-section">
-                        <h4>⚡ Energy Tests</h4>
-                        <div class="testing-controls">
-                            <BaseButton @click="simulationStore.triggerTestScenario('lowBattery')" variant="secondary"
-                                size="sm">
-                                🔋 Low Battery
-                            </BaseButton>
-                            <BaseButton @click="simulationStore.triggerTestScenario('powerOutage')" variant="danger"
-                                size="sm">
-                                ⚫ Power Outage
-                            </BaseButton>
-                        </div>
-                    </div>
-
-                    <!-- Safety & Complex Tests -->
-                    <div class="test-section">
-                        <h4>🚨 Safety & Complex Tests</h4>
-                        <div class="testing-controls">
-                            <BaseButton @click="simulationStore.triggerTestScenario('smokeAlarm')" variant="danger"
-                                size="sm">
-                                🚨 Smoke Alarm
-                            </BaseButton>
-                            <BaseButton @click="simulationStore.triggerTestScenario('comfortChallenge')"
-                                variant="secondary" size="sm">
-                                😰 Comfort Challenge
-                            </BaseButton>
-                        </div>
-                    </div>
-
-                    <!-- Time Controls -->
-                    <div class="test-section">
-                        <h4>🕐 Time Controls</h4>
-                        <div class="testing-controls">
-                            <BaseButton @click="setTimeOfDay('morning')" variant="ghost" size="sm">
-                                🌅 Morning (06:00)
-                            </BaseButton>
-                            <BaseButton @click="setTimeOfDay('noon')" variant="ghost" size="sm">
-                                ☀️ Noon (12:00)
-                            </BaseButton>
-                            <BaseButton @click="setTimeOfDay('evening')" variant="ghost" size="sm">
-                                🌆 Evening (18:00)
-                            </BaseButton>
-                        </div>
-                    </div>
-
-                    <!-- Location & Season Controls -->
-                    <div class="test-section">
-                        <h4>🌍 Location & Season</h4>
-
-                        <!-- Current Location Display -->
-                        <div class="current-location-display">
-                            <div class="location-info">
-                                <span class="location-label">📍 Current Location:</span>
-                                <span class="location-value">
-                                    {{ simulationStore.getCurrentCity()?.name || 'Denver' }},
-                                    {{ simulationStore.getCurrentCity()?.country || 'USA' }}
-                                </span>
-                            </div>
-                            <div class="season-info">
-                                <span class="season-label">📅 Current Season:</span>
-                                <span class="season-value">
-                                    {{ simulationStore.getCurrentSeasonalDate()?.name || 'Summer Solstice' }}
-                                </span>
-                            </div>
-                            <div class="climate-details">
-                                <span class="climate-label">🌤️ Day Length:</span>
-                                <span class="climate-value">{{ simulationStore.houseState.dayLength?.toFixed(1) ||
-                                    '14.0' }} hours</span>
-                                <span class="climate-label">☀️ Solar Elevation:</span>
-                                <span class="climate-value">{{ simulationStore.houseState.solarElevation?.toFixed(1) ||
-                                    '65.0' }}°</span>
-                            </div>
-                        </div>
-
-                        <!-- City Selection -->
-                        <div class="selection-group">
-                            <label class="selection-label">🏙️ Select City:</label>
-                            <select :value="simulationStore.houseState.location.cityId || 'denver'"
-                                @change="handleCityChange" class="city-selector">
-                                <option v-for="city in simulationStore.getCityList()" :key="city.id" :value="city.id">
-                                    {{ city.name }}, {{ city.country }} ({{ city.location.lat.toFixed(1) }}°N)
-                                </option>
-                            </select>
-                        </div>
-
-                        <!-- Seasonal Date Selection -->
-                        <div class="selection-group">
-                            <label class="selection-label">📆 Select Season:</label>
-                            <select :value="simulationStore.houseState.seasonalDateId || 'summer-solstice'"
-                                @change="handleSeasonChange" class="season-selector">
-                                <option v-for="seasonalDate in simulationStore.getSeasonalDateList()"
-                                    :key="seasonalDate.id" :value="seasonalDate.id">
-                                    {{ seasonalDate.name }} - {{ seasonalDate.description }}
-                                </option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Telemetry Controls -->
-                    <div class="test-section">
-                        <h4>📊 Telemetry</h4>
-                        <div class="testing-controls">
-                            <BaseButton @click="enableTelemetryLogging" variant="primary" size="sm"
-                                :disabled="telemetryEnabled">
-                                {{ telemetryEnabled ? '✅ Logging Enabled' : '📊 Enable Logging' }}
-                            </BaseButton>
-                            <BaseButton @click="clearConsole" variant="ghost" size="sm">
-                                🗑️ Clear Console
-                            </BaseButton>
-                        </div>
-                    </div>
-
-                    <div class="telemetry-info">
-                        <p><strong>📈 Telemetry Status:</strong> {{ telemetryStatusText }}</p>
-                        <p><strong>🎯 Performance Focus:</strong> {{ performanceFocusText }}</p>
-                    </div>
-
-                    <!-- Debug Data Table -->
                     <div class="debug-data-section">
                         <div class="debug-header">
                             <h4>🔧 Time Series Debug Log</h4>
@@ -565,6 +453,100 @@
                 </div>
             </div>
         </div>
+
+        <!-- Test Scenarios Modal -->
+        <div v-if="showTestScenariosModal" class="modal-overlay" @click="showTestScenariosModal = false">
+            <div class="modal-content" @click.stop>
+                <div class="modal-header">
+                    <h3>🧪 Test Scenarios</h3>
+                    <button @click="showTestScenariosModal = false" class="modal-close">✕</button>
+                </div>
+
+                <div class="modal-body">
+                    <!-- Active Test Scenario Display -->
+                    <div v-if="simulationStore.activeTestScenario" class="active-scenario-panel">
+                        <div class="scenario-header">
+                            <div class="scenario-info">
+                                <h4>🔬 Active Test Scenario</h4>
+                                <div class="scenario-details">
+                                    <span class="scenario-name">{{ simulationStore.activeTestScenario.name }}</span>
+                                    <span class="scenario-description">{{ simulationStore.activeTestScenario.description
+                                    }}</span>
+                                </div>
+                            </div>
+                            <BaseButton @click="simulationStore.clearTestScenario()" variant="secondary" size="sm">
+                                ❌ Clear Scenario
+                            </BaseButton>
+                        </div>
+                    </div>
+
+                    <!-- Environmental Test Scenarios -->
+                    <div class="test-section">
+                        <h4>🌡️ Environmental Tests</h4>
+                        <div class="testing-controls">
+                            <BaseButton @click="simulationStore.triggerTestScenario('heatWave')" variant="danger"
+                                size="sm">
+                                🔥 Heat Wave
+                            </BaseButton>
+                            <BaseButton @click="simulationStore.triggerTestScenario('coldSnap')" variant="primary"
+                                size="sm">
+                                🥶 Cold Snap
+                            </BaseButton>
+                            <BaseButton @click="simulationStore.triggerTestScenario('poorAirQuality')"
+                                variant="secondary" size="sm">
+                                💨 Poor Air Quality
+                            </BaseButton>
+                        </div>
+                    </div>
+
+                    <!-- Energy Test Scenarios -->
+                    <div class="test-section">
+                        <h4>⚡ Energy Tests</h4>
+                        <div class="testing-controls">
+                            <BaseButton @click="simulationStore.triggerTestScenario('lowBattery')" variant="secondary"
+                                size="sm">
+                                🔋 Low Battery
+                            </BaseButton>
+                            <BaseButton @click="simulationStore.triggerTestScenario('powerOutage')" variant="danger"
+                                size="sm">
+                                ⚫ Power Outage
+                            </BaseButton>
+                        </div>
+                    </div>
+
+                    <!-- Safety & Complex Tests -->
+                    <div class="test-section">
+                        <h4>🚨 Safety & Complex Tests</h4>
+                        <div class="testing-controls">
+                            <BaseButton @click="simulationStore.triggerTestScenario('smokeAlarm')" variant="danger"
+                                size="sm">
+                                🚨 Smoke Alarm
+                            </BaseButton>
+                            <BaseButton @click="simulationStore.triggerTestScenario('comfortChallenge')"
+                                variant="secondary" size="sm">
+                                😰 Comfort Challenge
+                            </BaseButton>
+                        </div>
+                    </div>
+
+                    <!-- Time Controls -->
+                    <div class="test-section">
+                        <h4>🕐 Time Controls</h4>
+                        <div class="testing-controls">
+                            <BaseButton @click="setTimeOfDay('morning')" variant="ghost" size="sm">
+                                🌅 Morning (06:00)
+                            </BaseButton>
+                            <BaseButton @click="setTimeOfDay('noon')" variant="ghost" size="sm">
+                                ☀️ Noon (12:00)
+                            </BaseButton>
+                            <BaseButton @click="setTimeOfDay('evening')" variant="ghost" size="sm">
+                                🌆 Evening (18:00)
+                            </BaseButton>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -593,8 +575,14 @@ onMounted(() => {
     simulationStore.addModule(createSolarModule())
     simulationStore.addModule(createBatteryModule())
 
+    // Auto-enable data logging  
+    autoLogging.value = true
+
     // Run initial simulation to populate energy balance
     simulationStore.runSimulation()
+
+    // Auto-start the simulation
+    simulationStore.startSimulation()
 })
 
 // Methods
@@ -700,7 +688,8 @@ const getModeIcon = (mode: string) => {
         'energy-saving': '💡',
         'comfort-priority': '😌',
         'high-solar': '☀️',
-        'low-battery': '🔋'
+        'low-battery': '🔋',
+        'air-quality-protection': '💨'
     }
     return modeIcons[mode as keyof typeof modeIcons] || '🏠'
 }
@@ -712,9 +701,82 @@ const formatMode = (mode: string) => {
         'energy-saving': 'Energy Conservation',
         'comfort-priority': 'Comfort Priority',
         'high-solar': 'High Solar Gain',
-        'low-battery': 'Low Battery Mode'
+        'low-battery': 'Low Battery Mode',
+        'air-quality-protection': 'Air Quality Protection'
     }
     return modeNames[mode as keyof typeof modeNames] || 'Normal Operation'
+}
+
+// All available modes for the UI
+const allModes = ref([
+    {
+        id: 'normal',
+        icon: '🏠',
+        name: 'Normal',
+        description: 'Standard efficient operation with balanced heating (21°C target), optimized energy usage (COP 3.5), and normal ventilation flow (200 m³/h). Default mode when no special conditions are detected.'
+    },
+    {
+        id: 'comfort-priority',
+        icon: '😌',
+        name: 'Comfort Priority',
+        description: 'Prioritizes temperature and comfort over energy efficiency. Activates when comfort drops below 60% or temperature error exceeds 3°C. Boosts heat pump to 4.2 COP and increases ERV efficiency to 80% for faster recovery.'
+    },
+    {
+        id: 'low-battery',
+        icon: '🔋',
+        name: 'Energy Saving',
+        description: 'Conserves battery power when charge drops below 20%. Reduces target temperature by 1°C (minimum 20°C) while improving heat pump efficiency to 4.5 COP to maintain comfort with less energy consumption.'
+    },
+    {
+        id: 'high-solar',
+        icon: '☀️',
+        name: 'High Solar',
+        description: 'Manages excessive solar heat gain when radiation exceeds 700 W/m². Reduces heat pump efficiency to 2.8 COP to compensate for passive solar heating through windows and prevent overheating.'
+    },
+    {
+        id: 'air-quality-protection',
+        icon: '💨',
+        name: 'Air Quality Protection',
+        description: 'Protects indoor air quality when outdoor AQI exceeds 100. Reduces ERV flow rate by 40% (minimum 100 m³/h) to limit contaminated outdoor air intake while maintaining necessary ventilation.'
+    },
+    {
+        id: 'emergency',
+        icon: '🚨',
+        name: 'Emergency',
+        description: 'Emergency response for smoke events. Activates sprinkler systems, doubles ERV flow rate to 400 m³/h for air evacuation, and prioritizes safety over energy efficiency. Cannot be manually activated.'
+    }
+])
+
+// Handle mode selection
+const handleModeClick = (modeId: string) => {
+    // Emergency mode cannot be manually set
+    if (modeId === 'emergency') {
+        return
+    }
+
+    // Override Henri's current mode
+    simulationStore.setManualMode(modeId)
+    console.log(`🎮 Manual mode override: ${formatMode(modeId)}`)
+}
+
+// Hover state for mode explanations
+const hoveredModeId = ref<string | null>(null)
+
+// Handle mode hover to show description
+const handleModeHover = (modeId: string) => {
+    hoveredModeId.value = modeId
+}
+
+// Handle mouse leave to revert to active mode description
+const handleModeLeave = () => {
+    hoveredModeId.value = null
+}
+
+// Get explanation for current mode or hovered mode
+const getCurrentModeExplanation = () => {
+    const displayModeId = hoveredModeId.value || simulationStore.currentMode
+    const currentMode = allModes.value.find(mode => mode.id === displayModeId)
+    return currentMode?.description || 'Standard efficient operation mode.'
 }
 
 const formatDecisionTime = (timestamp: number) => {
@@ -722,41 +784,7 @@ const formatDecisionTime = (timestamp: number) => {
     return `${hour.toString().padStart(2, '0')}:00`
 }
 
-// Telemetry Controls
-const telemetryEnabled = ref(false)
-
-// Computed properties to prevent linter from breaking strings
-const telemetryStatusText = computed(() =>
-    telemetryEnabled.value
-        ? 'Active - Check console for detailed logs'
-        : 'Disabled'
-)
-
-const performanceFocusText = computed(() =>
-    'Henri\'s decision accuracy, energy efficiency, comfort maintenance'
-)
-
-const enableTelemetryLogging = () => {
-    telemetryEnabled.value = true
-    console.log('%c🔧 HENRI TELEMETRY ENABLED', 'color: #16a34a; font-weight: bold; font-size: 16px;')
-    console.log('%cDetailed performance logging is now active. Run simulation steps to see Henri\'s decision-making process.', 'color: #059669;')
-    console.log('%cLook for these sections in the logs:', 'color: #374151;')
-    console.log('  🤖 Henri Decision Cycle - Overall adaptive analysis')
-    console.log('  📊 Environmental Analysis - Current conditions and targets')
-    console.log('  🧠 Henri\'s Current Mode - Operating mode and recent decisions')
-    console.log('  ⚙️  Adaptive Configurations - System settings adjustments')
-    console.log('  📈 Performance Metrics - Temperature error, comfort trends, efficiency')
-    console.log('  🔧 Module Performance - Individual system performance')
-    console.log('  🏁 Simulation Cycle Complete - Timing and summary')
-    console.log('')
-}
-
-const clearConsole = () => {
-    console.clear()
-    if (telemetryEnabled.value) {
-        console.log('%c🗑️ Console cleared - Telemetry logging continues', 'color: #6b7280; font-style: italic;')
-    }
-}
+// Data Logging Control
 
 // Time Series Debug Data Management
 const timeSeriesData = ref<Array<{
@@ -780,6 +808,9 @@ const timeSeriesData = ref<Array<{
 }>>([])
 
 const autoLogging = ref(false)
+
+// Test Scenarios Modal
+const showTestScenariosModal = ref(false)
 
 const logCurrentTimestep = () => {
     const state = simulationStore.houseState
@@ -1025,6 +1056,40 @@ watch(() => [
     gap: 2rem;
 }
 
+.header-controls {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-left: 2rem;
+}
+
+.location-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.5rem 1rem;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+}
+
+.location-controls label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #475569;
+    margin: 0;
+}
+
+.location-controls select {
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
+    font-size: 0.75rem;
+    background: white;
+    color: #374151;
+    min-width: 80px;
+}
+
 .time-slider-container {
     flex: 1;
     max-width: 500px;
@@ -1078,9 +1143,27 @@ watch(() => [
 }
 
 .dashboard {
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     gap: 1rem;
+    grid-auto-rows: min-content;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Ensure the debug table spans full width when in multi-column layout */
+.testing-panel {
+    grid-column: 1 / -1;
+}
+
+/* Ensure energy balance spans full width */
+.energy-balance-section {
+    grid-column: 1 / -1;
+}
+
+/* Ensure safety panel spans full width */
+.safety-panel {
+    grid-column: 1 / -1;
 }
 
 .overview-panel,
@@ -1106,64 +1189,133 @@ watch(() => [
 
 .decisions-grid {
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: 1fr;
     gap: 1rem;
     align-items: start;
     margin-bottom: 0.75rem;
 }
 
-.current-mode {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem;
-    background: #f1f5f9;
-    border-radius: 0.5rem;
-    border: 1px solid #e2e8f0;
+.modes-section {
+    margin-bottom: 1rem;
 }
 
-.mode-indicator {
-    font-size: 2rem;
-    min-width: 3rem;
-    text-align: center;
-    padding: 0.5rem;
-    border-radius: 0.5rem;
-    background: white;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.mode-indicator.emergency {
-    background: #fef2f2;
-    border: 2px solid #fca5a5;
-}
-
-.mode-indicator.energy-saving {
-    background: #f0fdf4;
-    border: 2px solid #86efac;
-}
-
-.mode-indicator.high-solar {
-    background: #fffbeb;
-    border: 2px solid #fcd34d;
-}
-
-.mode-text {
-    flex: 1;
-}
-
-.mode-label {
+.modes-label {
     font-size: 0.75rem;
     color: #64748b;
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.75rem;
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
 
-.mode-value {
-    font-size: 1rem;
+.modes-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.mode-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 0.5rem;
+    background: #f8fafc;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.5rem;
+    transition: all 0.2s ease;
+    position: relative;
+    min-height: 80px;
+}
+
+.mode-card.clickable {
+    cursor: pointer;
+}
+
+.mode-card.clickable:hover {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.mode-card.active {
+    background: #dbeafe;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.mode-card:not(.clickable) {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.mode-icon {
+    font-size: 1.5rem;
+    margin-bottom: 0.25rem;
+}
+
+.mode-name {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #374151;
+    text-align: center;
+    line-height: 1.2;
+}
+
+.active-indicator {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #10b981;
+    color: white;
+    font-size: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 1rem;
     font-weight: 700;
-    color: #0f172a;
+    letter-spacing: 0.05em;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.mode-explanation {
+    background: #fffbeb;
+    border: 1px solid #fed7aa;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    transition: all 0.2s ease;
+}
+
+.mode-explanation.preview-mode {
+    background: #f0f9ff;
+    border-color: #7dd3fc;
+}
+
+.explanation-label {
+    font-size: 0.75rem;
+    color: #92400e;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    transition: color 0.2s ease;
+}
+
+.mode-explanation.preview-mode .explanation-label {
+    color: #0369a1;
+}
+
+.explanation-text {
+    font-size: 0.8rem;
+    color: #7c2d12;
+    line-height: 1.4;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.mode-explanation.preview-mode .explanation-text {
+    color: #075985;
 }
 
 .recent-decisions {
@@ -1171,6 +1323,7 @@ watch(() => [
     border-radius: 0.5rem;
     padding: 0.75rem;
     border: 1px solid #e2e8f0;
+    margin-bottom: 0.75rem;
 }
 
 .decisions-label {
@@ -1239,7 +1392,7 @@ watch(() => [
 
 .metrics-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 0.75rem;
     justify-content: center;
 }
@@ -1302,9 +1455,8 @@ watch(() => [
 
 .modules-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: 1fr;
     gap: 0.75rem;
-    justify-content: center;
 }
 
 .module-card {
@@ -1551,46 +1703,43 @@ input:checked+.toggle-slider:before {
 }
 
 @media (min-width: 1920px) {
-    .metrics-grid {
-        grid-template-columns: repeat(6, 200px);
-    }
-
-    .modules-grid {
-        grid-template-columns: repeat(4, 300px);
-    }
+    /* Removed metrics-grid override for better automatic layout */
 }
 
 @media (min-width: 1440px) and (max-width: 1919px) {
-    .metrics-grid {
-        grid-template-columns: repeat(5, 200px);
-    }
-
-    .modules-grid {
-        grid-template-columns: repeat(3, 300px);
-    }
+    /* Removed metrics-grid override for better automatic layout */
 }
 
 @media (min-width: 1024px) and (max-width: 1439px) {
-    .metrics-grid {
-        grid-template-columns: repeat(4, 200px);
-    }
+    /* Removed metrics-grid override for better automatic layout */
+}
 
-    .modules-grid {
-        grid-template-columns: repeat(2, 300px);
+@media (min-width: 1200px) {
+    .dashboard {
+        grid-template-columns: repeat(3, 1fr);
+        max-width: 1400px;
     }
 }
 
-@media (max-width: 1023px) {
-    .metrics-grid {
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    }
-
-    .modules-grid {
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+@media (min-width: 768px) and (max-width: 1199px) {
+    .dashboard {
+        grid-template-columns: repeat(2, 1fr);
+        max-width: 100%;
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
+    .dashboard {
+        grid-template-columns: 1fr;
+        max-width: 100%;
+    }
+
+    .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 767px) {
     .house-simulation {
         padding: 0.75rem;
     }
@@ -1617,12 +1766,17 @@ input:checked+.toggle-slider:before {
         align-items: stretch;
     }
 
+    .dashboard {
+        grid-template-columns: 1fr;
+        max-width: 100%;
+    }
+
     .metrics-grid {
         grid-template-columns: repeat(2, 1fr);
     }
 
-    .modules-grid {
-        grid-template-columns: 1fr;
+    .modes-grid {
+        grid-template-columns: repeat(2, 1fr);
     }
 
     .simulation-controls,
@@ -1986,6 +2140,148 @@ input:checked+.toggle-slider:before {
     .season-selector {
         padding: 0.5rem;
         font-size: 0.8rem;
+    }
+}
+
+/* Test Scenarios Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.modal-content {
+    background: white;
+    border-radius: 1rem;
+    max-width: 700px;
+    max-height: 80vh;
+    width: 90%;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    animation: slideIn 0.3s ease-out;
+    overflow: hidden;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateY(-20px) scale(0.95);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0) scale(1);
+        opacity: 1;
+    }
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem 2rem;
+    border-bottom: 1px solid #e5e7eb;
+    background: #f8fafc;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #111827;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+    background: #f3f4f6;
+    color: #374151;
+}
+
+.modal-body {
+    padding: 1.5rem 2rem;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+/* Modal-specific styles for test sections */
+.modal-body .test-section {
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-body .test-section:last-of-type {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.modal-body .test-section h4 {
+    margin: 0 0 0.75rem 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #374151;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.modal-body .testing-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 0.75rem;
+}
+
+.modal-body .active-scenario-panel {
+    background: #fef3c7;
+    border: 2px solid #f59e0b;
+    border-radius: 0.75rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+@media (max-width: 768px) {
+    .modal-content {
+        width: 95%;
+        max-height: 90vh;
+        margin: 1rem;
+    }
+
+    .modal-header {
+        padding: 1rem 1.5rem;
+    }
+
+    .modal-body {
+        padding: 1rem 1.5rem;
+    }
+
+    .modal-body .testing-controls {
+        grid-template-columns: 1fr;
     }
 }
 </style>
