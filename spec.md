@@ -102,20 +102,61 @@ The Henri Home Simulation is a comprehensive Vue 3 web application that models a
 ### 6. Henri's Adaptive Intelligence ✅ IMPLEMENTED
 
 **Purpose**: AI-driven optimization and environmental response  
-**Modes**:
 
-- **Normal**: Standard efficient operation
-- **Emergency**: Smoke/safety event response
-- **Energy-Saving**: Low battery conservation mode
-- **Comfort-Priority**: Temperature/comfort optimization
-- **High-Solar**: Solar heat gain management
+**Henri's Operational Modes**:
 
-**Decision Making**:
+Henri dynamically switches between operational modes based on real-time environmental conditions and system status:
 
-- Real-time environmental analysis
-- Predictive adaptation planning
-- System efficiency optimization
-- Emergency protocol activation
+- **Normal Mode** (`normal`): Standard efficient operation
+  - Target temperature: 21°C
+  - Heat pump efficiency: 3.5 COP
+  - ERV flow rate: 200 m³/h
+  - ERV efficiency: 70%
+  - **Triggers**: Default state when no special conditions exist
+
+- **Emergency Mode** (`emergency`): Smoke/safety event response
+  - ERV flow rate: 2x normal (400+ m³/h) for rapid air evacuation
+  - Heat pump efficiency: Enhanced for climate control during emergency
+  - **Triggers**: Smoke event detected
+  - **Purpose**: Rapidly evacuate contaminated air while maintaining habitability
+
+- **Low Battery Mode** (`low-battery`): Energy conservation mode
+  - Target temperature: Reduced by 1°C (minimum 20°C)
+  - Heat pump efficiency: Increased by 20% (up to 4.5 COP) for energy conservation
+  - **Triggers**: Battery charge < 20%
+  - **Recovery**: Returns to normal when battery > 30%
+  - **Purpose**: Extend battery life during low energy periods
+
+- **Comfort Priority Mode** (`comfort-priority`): Temperature/comfort optimization
+  - Heat pump efficiency: Enhanced to 4.2 COP
+  - ERV efficiency: Increased to 80%
+  - **Triggers**: Poor comfort conditions (comfort score < 75% AND temperature error > 1°C)
+  - **Recovery**: Returns to normal when comfort > 80% AND temperature error < 1°C
+  - **Purpose**: Prioritize occupant comfort over energy efficiency
+
+- **High Solar Mode** (`high-solar`): Solar heat gain management
+  - Heat pump efficiency: Reduced to 2.8 COP (cooling mode optimization)
+  - **Triggers**: High solar radiation (> 600 W/m²) causing overheating
+  - **Recovery**: Returns to normal when solar radiation < 500 W/m²
+  - **Purpose**: Manage solar heat gain and prevent overheating
+
+- **Air Quality Protection Mode** (`air-quality-protection`): Pollution response
+  - ERV flow rate: Reduced to 60% of normal (minimum 100 m³/h)
+  - **Triggers**: Poor outdoor air quality
+  - **Purpose**: Minimize outdoor air intake during pollution events
+
+**Adaptive Decision Making**:
+
+- **Real-time Environmental Analysis**: Continuous monitoring of temperature, humidity, air quality, solar radiation, and energy status
+- **Predictive Adaptation Planning**: Anticipates needs and prepares system adjustments
+- **System Efficiency Optimization**: Balances energy consumption with performance requirements
+- **Emergency Protocol Activation**: Immediate response to safety events
+- **Mode Transition Logic**: Intelligent switching between modes with hysteresis to prevent oscillation
+
+**Manual Override Capability**:
+- Users can manually select any operational mode through the interface
+- Manual mode selection disables automatic adaptation until reset
+- All mode configurations are applied immediately upon selection
 
 ### 7. Henri Comparison System ✅ IMPLEMENTED
 
