@@ -1,8 +1,8 @@
-# Henri Home Passive House Simulation - Technical Specification v2.2
+# Henri Home Passive House Simulation - Technical Specification v2.3
 
 ## Overview
 
-The Henri Home Simulation is a comprehensive Vue 3 web application that models a high-performance passive house with adaptive environmental systems. Built on a modular architecture, it simulates thermal dynamics, energy flows, air quality, and comfort metrics with real-time physics-based calculations.
+The Henri Home Simulation is a comprehensive Vue 3 web application that models a high-performance passive house with adaptive environmental systems. Built on a modular architecture, it simulates thermal dynamics, energy flows, air quality, and comfort metrics with real-time physics-based calculations across multiple global cities and seasonal conditions.
 
 ## Architecture Summary
 
@@ -10,7 +10,8 @@ The Henri Home Simulation is a comprehensive Vue 3 web application that models a
 **State Management**: Pinia stores with reactive simulation engine  
 **Physics Engine**: Passive house physics with PHI-compliant energy balance calculations  
 **Adaptive Intelligence**: Henri's decision engine with environmental response algorithms  
-**Visualization**: Real-time charts and interactive module controls
+**Visualization**: Real-time charts and interactive module controls  
+**Climate System**: Multi-city, multi-seasonal climate modeling with accurate solar calculations
 
 ## Core Implemented Systems
 
@@ -21,8 +22,8 @@ The Henri Home Simulation is a comprehensive Vue 3 web application that models a
 **Configuration**:
 
 - Target temperature: 19-21°C (adaptive)
-- COP: 2.8-4.0 (adaptive based on conditions)
-- Capacity: 12 kW maximum
+- COP: 2.8-4.5 (adaptive based on conditions and mode)
+- Capacity: 18 kW maximum (improved for better temperature control)
 
 **Key Features**:
 
@@ -128,19 +129,66 @@ The Henri Home Simulation is a comprehensive Vue 3 web application that models a
   - Heat gains (solar, internal, auxiliary heating)
 - Proportional height scaling for accurate comparison
 
+### 8. Multi-City Climate System ✅ IMPLEMENTED
+
+**Purpose**: Realistic climate modeling across diverse global locations and seasons  
+**Coverage**: 9 global cities spanning major climate zones  
+**Seasons**: Winter/Spring/Summer/Fall solstices and equinoxes
+
+**Global Cities**:
+
+- **San Francisco, USA** (37.8°N) - Mediterranean climate
+- **Denver, USA** (39.7°N) - Continental semi-arid
+- **Los Angeles, USA** (34.1°N) - Mediterranean/desert
+- **Chicago, USA** (41.9°N) - Continental humid
+- **New York, USA** (40.7°N) - Humid subtropical
+- **Miami, USA** (25.8°N) - Tropical
+- **Dallas, USA** (32.8°N) - Humid subtropical/continental
+- **London, UK** (51.5°N) - Oceanic
+- **Frankfurt, Germany** (50.1°N) - Oceanic/continental
+
+**Seasonal Dates**:
+
+- **Winter Solstice** (Dec 21) - Minimal solar gain, shortest day
+- **Spring Equinox** (Mar 20) - Moderate solar, equal day/night
+- **Summer Solstice** (Jun 21) - Maximum solar gain, longest day
+- **Fall Equinox** (Sep 22) - Moderate solar, equal day/night
+
+**Climate Features**:
+
+- Realistic temperature ranges based on geographic location
+- Humidity patterns reflecting continental vs. maritime influence
+- Air quality baselines accounting for regional pollution levels
+- Accurate solar radiation calculations using latitude and solar declination
+- Day length calculations for each location and season
+- Diurnal temperature variations based on climate characteristics
+
 ## Data Model (TypeScript Interfaces)
 
 ```typescript
 interface HouseState {
   time: number // 0-23 hours
   date: string // YYYY-MM-DD format
-  location: Location // Denver coordinates
+  location: Location // Multi-city location with climate data
   outdoor: OutdoorConditions // Weather data
   indoor: IndoorConditions // Internal environment
   envelope: BuildingEnvelope // Building specifications
   energy: EnergyState // All energy flows
   safety: SafetyState // Emergency status
   comfortScore: number // 0-100 comfort metric
+
+  // Enhanced climate data
+  seasonalDateId?: string // Current seasonal date identifier
+  season?: 'winter' | 'spring' | 'summer' | 'fall'
+  dayLength?: number // Hours of daylight
+  solarElevation?: number // Current solar elevation angle
+}
+
+interface Location {
+  lat: number // Latitude in degrees
+  lon: number // Longitude in degrees
+  cityId?: string // City identifier for climate profiles
+  cityName?: string // Human-readable city name
 }
 
 interface EnergyState {
@@ -159,6 +207,25 @@ interface BuildingEnvelope {
   windowU: 0.8 // W/m²·K (triple glazed)
   windowArea: 20 // m²
   infiltrationRate: 0.3 // ACH (very tight)
+}
+
+interface ClimateProfile {
+  // Seasonal temperature ranges (°C)
+  winterTemp: { min: number; max: number }
+  springTemp: { min: number; max: number }
+  summerTemp: { min: number; max: number }
+  fallTemp: { min: number; max: number }
+
+  // Seasonal humidity patterns (0-1)
+  winterHumidity: number
+  summerHumidity: number
+  springHumidity: number
+  fallHumidity: number
+
+  // Climate characteristics
+  continentality: number // 0-1, affects daily temperature swing
+  maritimeInfluence: number // 0-1, affects temperature moderation
+  pollutionLevel: number // 0-1, affects air quality baseline
 }
 ```
 
@@ -213,6 +280,16 @@ interface BuildingEnvelope {
 - **System Status Grid**: Module cards with real-time status indicators
 - **Henri's Decision Engine**: Current mode, recent decisions, next adaptations
 - **Testing Scenarios**: Environmental stress tests and time controls
+- **Location & Season Controls**: City selection, seasonal date picker with climate info
+
+### Multi-City Climate Interface ✅ IMPLEMENTED
+
+- **Current Location Display**: Shows selected city, country, and coordinates
+- **Season Information**: Current seasonal date with day length and solar elevation
+- **City Selector**: Dropdown with 9 global cities across climate zones
+- **Seasonal Date Picker**: Choose from solstices and equinoxes
+- **Climate Visualization**: Real-time display of enhanced climate parameters
+- **Dynamic Header**: Updates location and season information automatically
 
 ### Module Status Cards ✅ IMPLEMENTED
 
@@ -343,6 +420,16 @@ interface SimulationModule {
   - **Solution**: Reset all energy flows at start of each simulation timestep
   - **Impact**: Battery now charges properly from excess solar generation
 
+### Major Improvements (v2.3)
+
+- **Multi-City Climate System**: Complete global climate modeling capability
+  - **Problem**: Simulation was limited to Denver summer solstice only
+  - **Solution**: Added 9 global cities with realistic climate profiles and 4 seasonal dates
+  - **Cities**: San Francisco, Denver, Los Angeles, Chicago, New York, Miami, Dallas, London, Frankfurt
+  - **Seasons**: Winter/Spring/Summer/Fall solstices and equinoxes
+  - **Features**: Accurate solar calculations, realistic temperature patterns, humidity modeling
+  - **Impact**: Enables passive house performance analysis across diverse climates and seasons
+
 ### Major Improvements (v2.2)
 
 - **Time Series Debug Interface**: Comprehensive debugging data table
@@ -353,4 +440,4 @@ interface SimulationModule {
 
 ---
 
-_This specification reflects the current implementation as of the Henri Home Simulation v2.2, including all major systems, adaptive intelligence, energy balance analysis, critical bug fixes, and comprehensive debugging tools._
+_This specification reflects the current implementation as of the Henri Home Simulation v2.3, including all major systems, adaptive intelligence, energy balance analysis, multi-city climate modeling, critical bug fixes, and comprehensive debugging tools._

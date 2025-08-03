@@ -74,16 +74,54 @@
       </section>
 
       <section class="location">
-        <h2>Climate Data</h2>
+        <h2>Multi-Climate Simulation</h2>
         <p>
-          The simulation uses synthetic weather data for <strong>Denver, Colorado</strong>
-          (39.7°N, 104.9°W) on the summer solstice (June 21st). The climate model includes:
+          The simulation features <strong>enhanced climate modeling</strong> with support for multiple cities
+          and seasonal variations. Choose from 9 global locations and 4 key seasonal dates to explore
+          passive house performance across different climates:
         </p>
+
+        <div class="climate-features">
+          <div class="feature-group">
+            <h3>🌍 Global Cities</h3>
+            <ul>
+              <li><strong>San Francisco, USA</strong> - Mediterranean climate (37.8°N)</li>
+              <li><strong>Denver, USA</strong> - Continental semi-arid (39.7°N)</li>
+              <li><strong>Los Angeles, USA</strong> - Mediterranean/desert (34.1°N)</li>
+              <li><strong>Chicago, USA</strong> - Continental humid (41.9°N)</li>
+              <li><strong>New York, USA</strong> - Humid subtropical (40.7°N)</li>
+              <li><strong>Miami, USA</strong> - Tropical (25.8°N)</li>
+              <li><strong>Dallas, USA</strong> - Humid subtropical (32.8°N)</li>
+              <li><strong>London, UK</strong> - Oceanic (51.5°N)</li>
+              <li><strong>Frankfurt, Germany</strong> - Continental oceanic (50.1°N)</li>
+            </ul>
+          </div>
+
+          <div class="feature-group">
+            <h3>📅 Seasonal Dates</h3>
+            <ul>
+              <li><strong>Winter Solstice</strong> (Dec 21) - Shortest day, minimal solar gain</li>
+              <li><strong>Spring Equinox</strong> (Mar 20) - Equal day/night, moderate solar</li>
+              <li><strong>Summer Solstice</strong> (Jun 21) - Longest day, maximum solar gain</li>
+              <li><strong>Fall Equinox</strong> (Sep 22) - Equal day/night, moderate solar</li>
+            </ul>
+          </div>
+        </div>
+
+        <p>
+          Each climate configuration includes realistic temperature ranges, humidity patterns,
+          air quality baselines, and accurate solar radiation calculations based on latitude
+          and seasonal solar angles.
+        </p>
+
+        <h3>🌤️ Enhanced Climate Modeling Features</h3>
         <ul>
-          <li>Diurnal temperature variation (15°C daily swing)</li>
-          <li>Solar radiation patterns based on sun angle</li>
-          <li>Humidity variations inverse to temperature</li>
-          <li>Air quality index fluctuations</li>
+          <li>Realistic diurnal temperature variations based on continental vs. maritime influence</li>
+          <li>Accurate solar radiation calculations using solar elevation and atmospheric transmission</li>
+          <li>Humidity patterns that respond to temperature and geographic location</li>
+          <li>Air quality baselines reflecting regional pollution levels</li>
+          <li>Day length calculations for each latitude and season</li>
+          <li>Solar declination angles for precise seasonal solar modeling</li>
         </ul>
       </section>
 
@@ -245,6 +283,30 @@ p {
   font-weight: 500;
 }
 
+.climate-features {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin: 1.5rem 0;
+}
+
+.feature-group h3 {
+  color: #1f2937;
+  font-size: 1.125rem;
+  margin-bottom: 1rem;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0.5rem;
+}
+
+.feature-group ul {
+  margin: 0;
+}
+
+.feature-group li {
+  margin-bottom: 0.75rem;
+  padding-left: 0.5rem;
+}
+
 @media (max-width: 768px) {
   .about {
     padding: 1rem;
@@ -256,6 +318,11 @@ p {
 
   h1 {
     font-size: 2rem;
+  }
+
+  .climate-features {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
   }
 
   .module-grid {

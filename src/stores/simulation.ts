@@ -3,6 +3,13 @@ import { ref, computed, reactive } from 'vue'
 import type { HouseState, ModuleConfigs, SimulationModule, ClimateData } from '@/types/simulation'
 import type { EnergyBalanceComponents } from '@/types/energy-balance'
 import {
+  generateEnhancedClimateData,
+  CITIES,
+  SEASONAL_DATES,
+  getCityById,
+  getSeasonalDateById,
+} from '@/utils/climate'
+import {
   EnergyBalanceCalculator,
   createDefaultBuildingZones,
   createDefaultThermalBridges,
@@ -11,8 +18,15 @@ import {
 // Default house state
 const createDefaultHouseState = (): HouseState => ({
   time: 12, // Start at noon
-  date: '2025-06-21', // Summer solstice
-  location: { lat: 39.7392, lon: -104.9903 }, // Denver
+  date: '2024-06-21', // Summer solstice
+  location: {
+    lat: 39.7392,
+    lon: -104.9903,
+    cityId: 'denver',
+    cityName: 'Denver',
+  }, // Denver
+  seasonalDateId: 'summer-solstice',
+  season: 'summer',
 
   outdoor: {
     temperature: 25, // °C
@@ -117,10 +131,45 @@ export const useSimulationStore = defineStore('simulation', () => {
   }
 
   const updateClimateConditions = () => {
-    const climateData = generateClimateData(houseState.time)
-    houseState.outdoor = {
-      ...houseState.outdoor,
-      ...climateData,
+    if (!houseState.location.cityId || !houseState.seasonalDateId) {
+      // Fallback to legacy climate generation for backward compatibility
+      const climateData = generateClimateData(houseState.time)
+      houseState.outdoor = {
+        ...houseState.outdoor,
+        ...climateData,
+      }
+      return
+    }
+
+    try {
+      const enhancedClimate = generateEnhancedClimateData(
+        houseState.location.cityId,
+        houseState.seasonalDateId,
+        houseState.time,
+      )
+
+      // Update outdoor conditions
+      houseState.outdoor = {
+        temperature: enhancedClimate.temperature,
+        humidity: enhancedClimate.humidity,
+        solarRadiation: enhancedClimate.solarRadiation,
+        airQualityIndex: enhancedClimate.airQualityIndex,
+        windSpeed: enhancedClimate.windSpeed,
+      }
+
+      // Update seasonal metadata
+      houseState.season = enhancedClimate.season
+      houseState.dayLength = enhancedClimate.dayLength
+      houseState.solarElevation = enhancedClimate.solarElevation
+      houseState.date = enhancedClimate.seasonalDate
+    } catch (error) {
+      console.warn('Enhanced climate generation failed, falling back to legacy system:', error)
+      // Fallback to legacy system
+      const climateData = generateClimateData(houseState.time)
+      houseState.outdoor = {
+        ...houseState.outdoor,
+        ...climateData,
+      }
     }
   }
 
@@ -383,17 +432,8 @@ export const useSimulationStore = defineStore('simulation', () => {
 
         // Pass module config for modules that need it
         if (module.name === 'heatPump') {
-          // Inject target temperature into heat pump simulation
-          const originalTemp = houseState.indoor.temperature
-          module.simulate(houseState, timestepHours)
-
-          // Apply target temperature logic
-          const targetTemp = moduleConfigs.heatPump.targetTemperature
-          const tempDiff = targetTemp - originalTemp
-
-          if (Math.abs(tempDiff) > 0.1) {
-            houseState.indoor.temperature = originalTemp + tempDiff * 0.1 // Gradual adjustment
-          }
+          // Pass heat pump configuration for proper target temperature control
+          module.simulate(houseState, timestepHours, moduleConfigs.heatPump)
         } else if (module.name === 'erv') {
           // Pass ERV configuration for adaptive behavior
           module.simulate(houseState, timestepHours, moduleConfigs.erv)
@@ -596,12 +636,17 @@ export const useSimulationStore = defineStore('simulation', () => {
       currentMode.value = 'low-battery'
       addDecision('Low battery mode activated', `Battery at ${Math.round(batteryPercent)}%`)
 
-      // Reduce heat pump target temperature to conserve energy
+      // Focus on efficiency rather than drastically lowering temperature
+      // Reduce target by only 1°C and increase efficiency instead
       moduleConfigs.heatPump.targetTemperature = Math.max(
-        19,
+        20, // Keep minimum at 20°C for comfort
         moduleConfigs.heatPump.targetTemperature - 1,
       )
-      addDecision('Temperature setpoint lowered', 'Conserving battery energy')
+
+      // Improve heat pump efficiency to use less energy for same heating
+      moduleConfigs.heatPump.efficiency = Math.min(4.5, moduleConfigs.heatPump.efficiency * 1.2)
+
+      addDecision('Efficiency optimization', 'Conserving battery with better COP')
 
       nextAdaptation.value = 'Will restore normal temperature when battery > 30%'
     }
@@ -621,20 +666,30 @@ export const useSimulationStore = defineStore('simulation', () => {
       }
     }
 
-    // Comfort priority mode - when comfort score drops
-    if (houseState.comfortScore < 60 && currentMode.value !== 'comfort-priority') {
-      currentMode.value = 'comfort-priority'
-      addDecision('Comfort priority mode', `Comfort score: ${houseState.comfortScore}%`)
+    // Comfort priority mode - when comfort score drops or temperature is far from target
+    const tempError = Math.abs(
+      houseState.indoor.temperature - moduleConfigs.heatPump.targetTemperature,
+    )
 
-      // Boost heat pump efficiency
-      moduleConfigs.heatPump.efficiency = 4.0
-      addDecision('Heat pump efficiency boosted', 'Prioritizing occupant comfort')
+    if (
+      (houseState.comfortScore < 60 || tempError > 3) &&
+      currentMode.value !== 'comfort-priority'
+    ) {
+      currentMode.value = 'comfort-priority'
+      addDecision(
+        'Comfort priority mode',
+        `Comfort: ${houseState.comfortScore}%, Temp error: ${tempError.toFixed(1)}°C`,
+      )
+
+      // Boost heat pump efficiency and capacity for faster recovery
+      moduleConfigs.heatPump.efficiency = 4.2
+      addDecision('Heat pump efficiency boosted', 'Prioritizing temperature recovery')
 
       // Increase ERV efficiency
       moduleConfigs.erv.efficiency = 0.8
       addDecision('ERV efficiency increased', 'Improving air quality')
 
-      nextAdaptation.value = 'Will return to normal when comfort > 80%'
+      nextAdaptation.value = 'Will return to normal when comfort > 80% and temp error < 1°C'
     }
 
     // Return to normal mode conditions
@@ -649,12 +704,18 @@ export const useSimulationStore = defineStore('simulation', () => {
       if (currentMode.value === 'low-battery' && batteryPercent > 30) {
         shouldReturnToNormal = true
         moduleConfigs.heatPump.targetTemperature = 21 // Restore normal temperature
+        moduleConfigs.heatPump.efficiency = 3.5 // Restore normal efficiency
       }
 
-      if (currentMode.value === 'comfort-priority' && houseState.comfortScore > 80) {
-        shouldReturnToNormal = true
-        moduleConfigs.heatPump.efficiency = 3.5 // Restore normal efficiency
-        moduleConfigs.erv.efficiency = 0.7 // Restore normal efficiency
+      if (currentMode.value === 'comfort-priority') {
+        const currentTempError = Math.abs(
+          houseState.indoor.temperature - moduleConfigs.heatPump.targetTemperature,
+        )
+        if (houseState.comfortScore > 80 && currentTempError < 1) {
+          shouldReturnToNormal = true
+          moduleConfigs.heatPump.efficiency = 3.5 // Restore normal efficiency
+          moduleConfigs.erv.efficiency = 0.7 // Restore normal efficiency
+        }
       }
 
       if (
@@ -778,6 +839,59 @@ export const useSimulationStore = defineStore('simulation', () => {
     }
   }
 
+  // === CITY AND SEASONAL DATE MANAGEMENT ===
+
+  const setCity = (cityId: string) => {
+    const city = getCityById(cityId)
+    if (!city) {
+      console.warn(`Unknown city ID: ${cityId}`)
+      return
+    }
+
+    houseState.location = {
+      lat: city.location.lat,
+      lon: city.location.lon,
+      cityId: city.id,
+      cityName: city.name,
+    }
+
+    console.log(
+      `%c🌍 City changed to ${city.name}, ${city.country}`,
+      'color: #2563eb; font-weight: bold;',
+    )
+    console.log(`  📍 Location: ${city.location.lat}°N, ${Math.abs(city.location.lon)}°W`)
+
+    // Update climate conditions and re-run simulation
+    updateClimateConditions()
+    runSimulation()
+  }
+
+  const setSeasonalDate = (seasonalDateId: string) => {
+    const seasonalDate = getSeasonalDateById(seasonalDateId)
+    if (!seasonalDate) {
+      console.warn(`Unknown seasonal date ID: ${seasonalDateId}`)
+      return
+    }
+
+    houseState.seasonalDateId = seasonalDate.id
+    houseState.date = seasonalDate.date
+
+    console.log(`%c📅 Season changed to ${seasonalDate.name}`, 'color: #2563eb; font-weight: bold;')
+    console.log(`  📝 ${seasonalDate.description}`)
+    console.log(`  🌅 Day ${seasonalDate.dayOfYear} of year`)
+
+    // Update climate conditions and re-run simulation
+    updateClimateConditions()
+    runSimulation()
+  }
+
+  const getCityList = () => CITIES
+  const getSeasonalDateList = () => SEASONAL_DATES
+  const getCurrentCity = () =>
+    houseState.location.cityId ? getCityById(houseState.location.cityId) : null
+  const getCurrentSeasonalDate = () =>
+    houseState.seasonalDateId ? getSeasonalDateById(houseState.seasonalDateId) : null
+
   return {
     // State
     houseState,
@@ -816,6 +930,14 @@ export const useSimulationStore = defineStore('simulation', () => {
     analyzeEnvironment,
     triggerTestScenario,
     clearTestScenario,
+
+    // New climate actions
+    setCity,
+    setSeasonalDate,
+    getCityList,
+    getSeasonalDateList,
+    getCurrentCity,
+    getCurrentSeasonalDate,
   }
 })
 

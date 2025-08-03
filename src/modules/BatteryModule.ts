@@ -35,7 +35,8 @@ export function simulateBattery(
       batteryCapacity - currentCharge, // Remaining battery capacity
     )
 
-    if (maxChargeAmount > 0.05) { // Only charge if meaningful amount
+    if (maxChargeAmount > 0.05) {
+      // Only charge if meaningful amount
       const actualChargeAmount = maxChargeAmount * efficiency
       currentCharge += actualChargeAmount
       batteryEnergyFlow = actualChargeAmount // Positive = charging
@@ -49,7 +50,8 @@ export function simulateBattery(
       currentCharge, // Available battery charge
     )
 
-    if (maxDischargeAmount > 0.05) { // Only discharge if meaningful amount
+    if (maxDischargeAmount > 0.05) {
+      // Only discharge if meaningful amount
       currentCharge -= maxDischargeAmount
       batteryEnergyFlow = -maxDischargeAmount // Negative = discharging
     }

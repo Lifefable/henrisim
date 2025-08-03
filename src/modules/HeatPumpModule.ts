@@ -12,14 +12,24 @@ export function simulateHeatPump(
 ): HouseState {
   const { indoor, outdoor, envelope, energy } = houseState
 
-  // Get target temperature from module config (will be passed from store)
-  const targetTemp = 21 // Default target, should come from config
-  const heatPumpCOP = 3.5 // Coefficient of Performance
-  const heatPumpCapacity = 12 // kW maximum capacity
+  // Get target temperature from module config (passed from store)
+  const targetTemp = config?.targetTemperature || 21
+  const heatPumpCOP = config?.efficiency || 3.5 // Use adaptive COP from store
+  const heatPumpCapacity = 18 // kW maximum capacity - increased for better control
 
   // Calculate required heating/cooling to reach target
   const tempDifference = targetTemp - indoor.temperature
-  const requiredEnergyKW = Math.abs(tempDifference) * envelope.floorArea * 0.1 // Simplified
+
+  // Improved heat pump sizing calculation based on building thermal mass and heat loss
+  const buildingThermalMass = envelope.floorArea * 0.5 // kWh/K (increased thermal mass)
+  const heatLossRate = Math.abs(tempDifference) * envelope.floorArea * 0.12 // W/K (realistic heat loss)
+
+  // Calculate required energy accounting for both temperature change and ongoing losses
+  const tempChangeEnergy = Math.abs(tempDifference) * buildingThermalMass
+  const continuousLossEnergy = (heatLossRate * timestepHours) / 1000 // kWh
+  const totalRequiredEnergy = tempChangeEnergy + continuousLossEnergy
+
+  const requiredEnergyKW = totalRequiredEnergy / timestepHours
 
   // Determine if heating or cooling is needed
   const isCooling = tempDifference < 0
@@ -35,9 +45,13 @@ export function simulateHeatPump(
     // Calculate electrical energy consumption (COP accounts for efficiency)
     energyUsed = (actualEnergyKW / heatPumpCOP) * timestepHours
 
-    // Calculate temperature change achieved
+    // More realistic temperature change calculation
     const heatDelivered = actualEnergyKW * timestepHours
-    temperatureChange = heatDelivered / (envelope.floorArea * 0.3) // Simplified thermal mass
+    temperatureChange = heatDelivered / buildingThermalMass
+
+    // Apply proportional control to prevent overshoot
+    const maxTempChange = Math.abs(tempDifference) * 0.8 // Limit to 80% of difference per timestep
+    temperatureChange = Math.min(temperatureChange, maxTempChange)
 
     if (isCooling) {
       temperatureChange = -temperatureChange

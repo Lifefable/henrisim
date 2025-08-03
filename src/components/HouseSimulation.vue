@@ -6,12 +6,17 @@
                     <h1>Henri Home Passive House Simulation</h1>
                     <p class="simulation-subtitle">
                         {{ formatDate(simulationStore.houseState.date) }} -
-                        Denver, CO
+                        {{ simulationStore.getCurrentCity()?.name || 'Denver' }}, {{
+                            simulationStore.getCurrentCity()?.country || 'USA' }}
+                        - {{ simulationStore.getCurrentSeasonalDate()?.name || 'Summer Solstice' }}
                     </p>
                 </div>
                 <div class="time-display">
                     <h2>{{ formatTime(simulationStore.currentHour) }}</h2>
                     <p>Hour {{ simulationStore.currentHour }} of 24</p>
+                    <p v-if="simulationStore.houseState.dayLength" class="daylight-info">
+                        {{ simulationStore.houseState.dayLength.toFixed(1) }}h daylight
+                    </p>
                 </div>
             </div>
 
@@ -52,8 +57,9 @@
                                 <div class="metric-label">Indoor Temp</div>
                                 <div class="metric-value">{{
                                     formatTemperature(simulationStore.houseState.indoor.temperature) }}</div>
-                                <div class="metric-subtitle">Target: {{
-                                    formatTemperature(simulationStore.moduleConfigs.heatPump.targetTemperature) }}</div>
+                                <div class="metric-subtitle">{{
+                                    formatHumidity(simulationStore.houseState.indoor.humidity) }} humidity • Target: {{
+                                        formatTemperature(simulationStore.moduleConfigs.heatPump.targetTemperature) }}</div>
                             </div>
                         </div>
 
@@ -373,6 +379,59 @@
                         </div>
                     </div>
 
+                    <!-- Location & Season Controls -->
+                    <div class="test-section">
+                        <h4>🌍 Location & Season</h4>
+
+                        <!-- Current Location Display -->
+                        <div class="current-location-display">
+                            <div class="location-info">
+                                <span class="location-label">📍 Current Location:</span>
+                                <span class="location-value">
+                                    {{ simulationStore.getCurrentCity()?.name || 'Denver' }},
+                                    {{ simulationStore.getCurrentCity()?.country || 'USA' }}
+                                </span>
+                            </div>
+                            <div class="season-info">
+                                <span class="season-label">📅 Current Season:</span>
+                                <span class="season-value">
+                                    {{ simulationStore.getCurrentSeasonalDate()?.name || 'Summer Solstice' }}
+                                </span>
+                            </div>
+                            <div class="climate-details">
+                                <span class="climate-label">🌤️ Day Length:</span>
+                                <span class="climate-value">{{ simulationStore.houseState.dayLength?.toFixed(1) ||
+                                    '14.0' }} hours</span>
+                                <span class="climate-label">☀️ Solar Elevation:</span>
+                                <span class="climate-value">{{ simulationStore.houseState.solarElevation?.toFixed(1) ||
+                                    '65.0' }}°</span>
+                            </div>
+                        </div>
+
+                        <!-- City Selection -->
+                        <div class="selection-group">
+                            <label class="selection-label">🏙️ Select City:</label>
+                            <select :value="simulationStore.houseState.location.cityId || 'denver'"
+                                @change="handleCityChange" class="city-selector">
+                                <option v-for="city in simulationStore.getCityList()" :key="city.id" :value="city.id">
+                                    {{ city.name }}, {{ city.country }} ({{ city.location.lat.toFixed(1) }}°N)
+                                </option>
+                            </select>
+                        </div>
+
+                        <!-- Seasonal Date Selection -->
+                        <div class="selection-group">
+                            <label class="selection-label">📆 Select Season:</label>
+                            <select :value="simulationStore.houseState.seasonalDateId || 'summer-solstice'"
+                                @change="handleSeasonChange" class="season-selector">
+                                <option v-for="seasonalDate in simulationStore.getSeasonalDateList()"
+                                    :key="seasonalDate.id" :value="seasonalDate.id">
+                                    {{ seasonalDate.name }} - {{ seasonalDate.description }}
+                                </option>
+                            </select>
+                        </div>
+                    </div>
+
                     <!-- Telemetry Controls -->
                     <div class="test-section">
                         <h4>📊 Telemetry</h4>
@@ -441,7 +500,7 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr v-for="(row, index) in timeSeriesData.slice(-20)" :key="index" :class="{
+                                        <tr v-for="(row, index) in timeSeriesData" :key="index" :class="{
                                             'current-hour': row.hour === simulationStore.houseState.time,
                                             'energy-surplus': parseFloat(row.energyBalance) > 0,
                                             'energy-deficit': parseFloat(row.energyBalance) < 0,
@@ -618,6 +677,21 @@ const setTimeOfDay = (timeOfDay: string) => {
     simulationStore.setTime(hour)
 }
 
+// New handlers for location and season
+const handleCityChange = (event: Event) => {
+    const target = event.target as HTMLSelectElement
+    if (target?.value) {
+        simulationStore.setCity(target.value)
+    }
+}
+
+const handleSeasonChange = (event: Event) => {
+    const target = event.target as HTMLSelectElement
+    if (target?.value) {
+        simulationStore.setSeasonalDate(target.value)
+    }
+}
+
 // Decision Engine Formatters
 const getModeIcon = (mode: string) => {
     const modeIcons = {
@@ -749,7 +823,7 @@ const logCurrentTimestep = () => {
     if (!existingEntry) {
         timeSeriesData.value.push(logEntry)
         console.log(`📊 Logged timestep ${logEntry.hour}:00 - Solar: ${logEntry.solarKWh} kWh, Battery: ${logEntry.batteryPercent}%, Balance: ${logEntry.energyBalance} kWh`)
-        
+
         // Debug battery behavior
         if (parseFloat(logEntry.batteryPercent) === 0 || parseFloat(logEntry.batteryPercent) === 100) {
             console.log(`🔋 Battery edge case: ${logEntry.batteryPercent}% (${logEntry.batteryKWh} kWh) - Solar: ${logEntry.solarKWh}, HP: ${logEntry.heatPumpKWh}`)
@@ -937,6 +1011,12 @@ watch(() => [
     color: #6b7280;
     font-size: 0.875rem;
     margin: 0;
+}
+
+.daylight-info {
+    color: #3b82f6 !important;
+    font-weight: 600;
+    font-size: 0.8rem !important;
 }
 
 .time-control-panel {
@@ -1808,6 +1888,104 @@ input:checked+.toggle-slider:before {
     .timeseries-table th,
     .timeseries-table td {
         padding: 0.375rem 0.25rem;
+    }
+}
+
+/* Location & Season Controls Styling */
+.current-location-display {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.location-info,
+.season-info,
+.climate-details {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.climate-details {
+    display: grid;
+    grid-template-columns: auto 1fr auto 1fr;
+    gap: 0.5rem 1rem;
+    margin-bottom: 0;
+}
+
+.location-label,
+.season-label,
+.climate-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.location-value,
+.season-value,
+.climate-value {
+    font-size: 0.875rem;
+    color: #0f172a;
+    font-weight: 700;
+}
+
+.selection-group {
+    margin-bottom: 1rem;
+}
+
+.selection-label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+.city-selector,
+.season-selector {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.5rem;
+    background: white;
+    font-size: 0.875rem;
+    color: #374151;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.city-selector:hover,
+.season-selector:hover {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.city-selector:focus,
+.season-selector:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+@media (max-width: 768px) {
+    .current-location-display {
+        padding: 0.75rem;
+    }
+
+    .climate-details {
+        grid-template-columns: 1fr;
+        gap: 0.25rem;
+    }
+
+    .city-selector,
+    .season-selector {
+        padding: 0.5rem;
+        font-size: 0.8rem;
     }
 }
 </style>

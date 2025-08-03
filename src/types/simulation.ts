@@ -3,6 +3,8 @@
 export interface Location {
   lat: number
   lon: number
+  cityId?: string // Optional city identifier for enhanced climate data
+  cityName?: string // Human-readable city name
 }
 
 export interface OutdoorConditions {
@@ -53,6 +55,12 @@ export interface HouseState {
   energy: EnergyState
   safety: SafetyState
   comfortScore: number // 0-100
+
+  // Enhanced seasonal/geographic data
+  seasonalDateId?: string // ID of current seasonal date (solstice/equinox)
+  season?: 'winter' | 'spring' | 'summer' | 'fall'
+  dayLength?: number // Hours of daylight
+  solarElevation?: number // Current solar elevation angle
 }
 
 export interface SimulationModule {
