@@ -1,4 +1,4 @@
-# Henri Home Passive House Simulation - Technical Specification v2.0
+# Henri Home Passive House Simulation - Technical Specification v2.2
 
 ## Overview
 
@@ -271,6 +271,15 @@ Each module displays:
 - **Energy Efficiency**: System performance indicators
 - **Module Status**: Active/inactive state tracking
 
+### Time Series Debug Interface ✅ IMPLEMENTED
+
+- **Structured Data Table**: Hour-by-hour simulation data in tabular format
+- **Copy/Paste Functionality**: Tab-separated data for easy analysis
+- **Auto-logging**: Automatic data capture during simulation playback
+- **CSV Export**: Download time series data for external analysis
+- **High Contrast Design**: Black text on white background for readability
+- **Key Metrics Tracking**: All critical simulation parameters per timestep
+
 ## Technical Implementation
 
 ### Module Architecture
@@ -334,6 +343,14 @@ interface SimulationModule {
   - **Solution**: Reset all energy flows at start of each simulation timestep
   - **Impact**: Battery now charges properly from excess solar generation
 
+### Major Improvements (v2.2)
+
+- **Time Series Debug Interface**: Comprehensive debugging data table
+  - **Problem**: Console logging was inadequate for debugging simulation behavior
+  - **Solution**: Added structured time series data table with copy/paste functionality
+  - **Features**: Auto-logging, CSV export, high contrast design, hour-by-hour tracking
+  - **Impact**: Enables effective debugging and analysis of simulation behavior over time
+
 ---
 
-_This specification reflects the current implementation as of the Henri Home Simulation v2.1, including all major systems, adaptive intelligence, energy balance analysis, and critical bug fixes._
+_This specification reflects the current implementation as of the Henri Home Simulation v2.2, including all major systems, adaptive intelligence, energy balance analysis, critical bug fixes, and comprehensive debugging tools._

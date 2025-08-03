@@ -95,7 +95,7 @@
                             <div class="metric-content">
                                 <div class="metric-label">Battery</div>
                                 <div class="metric-value">{{ formatEnergy(simulationStore.houseState.energy.batteryKWh)
-                                }}</div>
+                                    }}</div>
                                 <div class="metric-subtitle">{{ getBatteryPercentage() }}% charged</div>
                             </div>
                         </div>
@@ -149,7 +149,7 @@
                                 <div class="module-stat">
                                     <span>Target Temp:</span>
                                     <span>{{ formatTemperature(simulationStore.moduleConfigs.heatPump.targetTemperature)
-                                    }}</span>
+                                        }}</span>
                                 </div>
                                 <div class="module-stat">
                                     <span>COP:</span>
@@ -299,7 +299,7 @@
                                 <div class="scenario-details">
                                     <span class="scenario-name">{{ simulationStore.activeTestScenario.name }}</span>
                                     <span class="scenario-description">{{ simulationStore.activeTestScenario.description
-                                        }}</span>
+                                    }}</span>
                                 </div>
                             </div>
                             <BaseButton @click="simulationStore.clearTestScenario()" variant="secondary" size="sm">
@@ -391,6 +391,84 @@
                         <p><strong>📈 Telemetry Status:</strong> {{ telemetryStatusText }}</p>
                         <p><strong>🎯 Performance Focus:</strong> {{ performanceFocusText }}</p>
                     </div>
+
+                    <!-- Debug Data Table -->
+                    <div class="debug-data-section">
+                        <div class="debug-header">
+                            <h4>🔧 Time Series Debug Log</h4>
+                            <div class="debug-controls">
+                                <BaseButton @click="copyTimeSeriesData" variant="ghost" size="sm">
+                                    📋 Copy Time Series
+                                </BaseButton>
+                                <BaseButton @click="clearTimeSeriesData" variant="ghost" size="sm">
+                                    �️ Clear Log
+                                </BaseButton>
+                                <BaseButton @click="exportTimeSeriesCSV" variant="ghost" size="sm">
+                                    📄 Export CSV
+                                </BaseButton>
+                            </div>
+                        </div>
+
+                        <div class="timeseries-container">
+                            <div class="timeseries-info">
+                                <p><strong>Rows logged:</strong> {{ timeSeriesData.length }}</p>
+                                <p><strong>Auto-logging:</strong> {{ autoLogging ? '✅ Enabled' : '❌ Disabled' }}</p>
+                                <BaseButton @click="toggleAutoLogging" variant="ghost" size="sm">
+                                    {{ autoLogging ? 'Disable Auto-Log' : 'Enable Auto-Log' }}
+                                </BaseButton>
+                            </div>
+
+                            <div class="timeseries-table-container">
+                                <table class="timeseries-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Hour</th>
+                                            <th>Temp Out</th>
+                                            <th>Temp In</th>
+                                            <th>Solar W/m²</th>
+                                            <th>Solar kWh</th>
+                                            <th>Heat Pump kWh</th>
+                                            <th>ERV kWh</th>
+                                            <th>Battery kWh</th>
+                                            <th>Battery %</th>
+                                            <th>Net Grid kWh</th>
+                                            <th>Energy Balance</th>
+                                            <th>Comfort %</th>
+                                            <th>Henri Mode</th>
+                                            <th>HP Enabled</th>
+                                            <th>Solar Enabled</th>
+                                            <th>Battery Enabled</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(row, index) in timeSeriesData.slice(-20)" :key="index"
+                                            :class="{ 'current-hour': row.hour === simulationStore.houseState.time }">
+                                            <td>{{ row.hour }}:00</td>
+                                            <td>{{ row.tempOut }}</td>
+                                            <td>{{ row.tempIn }}</td>
+                                            <td>{{ row.solarRadiation }}</td>
+                                            <td>{{ row.solarKWh }}</td>
+                                            <td>{{ row.heatPumpKWh }}</td>
+                                            <td>{{ row.ervKWh }}</td>
+                                            <td>{{ row.batteryKWh }}</td>
+                                            <td>{{ row.batteryPercent }}</td>
+                                            <td>{{ row.netKWh }}</td>
+                                            <td>{{ row.energyBalance }}</td>
+                                            <td>{{ row.comfort }}</td>
+                                            <td>{{ row.henriMode }}</td>
+                                            <td>{{ row.hpEnabled ? 'Y' : 'N' }}</td>
+                                            <td>{{ row.solarEnabled ? 'Y' : 'N' }}</td>
+                                            <td>{{ row.batteryEnabled ? 'Y' : 'N' }}</td>
+                                        </tr>
+                                        <tr v-if="timeSeriesData.length === 0">
+                                            <td colspan="16" class="no-data">No data logged yet. Run simulation or
+                                                enable auto-logging.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Energy Balance Chart -->
@@ -427,7 +505,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch, nextTick } from 'vue'
 import { useSimulationStore } from '@/stores/simulation'
 import { createHeatPumpModule } from '@/modules/HeatPumpModule'
 import { createERVModule } from '@/modules/ERVModule'
@@ -467,6 +545,13 @@ const togglePlayback = () => {
 const toggleModule = (moduleName: string) => {
     simulationStore.toggleModule(moduleName)
     simulationStore.runSimulation()
+    
+    // Auto-log after module toggle
+    if (autoLogging.value) {
+        nextTick(() => {
+            logCurrentTimestep()
+        })
+    }
 }
 
 const isModuleEnabled = (moduleName: string) => {
@@ -593,6 +678,185 @@ const clearConsole = () => {
         console.log('%c🗑️ Console cleared - Telemetry logging continues', 'color: #6b7280; font-style: italic;')
     }
 }
+
+// Time Series Debug Data Management
+const timeSeriesData = ref<Array<{
+    hour: number,
+    tempOut: string,
+    tempIn: string,
+    solarRadiation: number,
+    solarKWh: string,
+    heatPumpKWh: string,
+    ervKWh: string,
+    batteryKWh: string,
+    batteryPercent: string,
+    netKWh: string,
+    energyBalance: string,
+    comfort: number,
+    henriMode: string,
+    hpEnabled: boolean,
+    solarEnabled: boolean,
+    batteryEnabled: boolean,
+    timestamp: string
+}>>([])
+
+const autoLogging = ref(false)
+
+const logCurrentTimestep = () => {
+    const state = simulationStore.houseState
+    const energyBalance = state.energy.solarKWh - state.energy.heatPumpKWh - state.energy.ervKWh
+    
+    const logEntry = {
+        hour: state.time,
+        tempOut: state.outdoor.temperature.toFixed(1),
+        tempIn: state.indoor.temperature.toFixed(1),
+        solarRadiation: state.outdoor.solarRadiation,
+        solarKWh: state.energy.solarKWh.toFixed(3),
+        heatPumpKWh: state.energy.heatPumpKWh.toFixed(3),
+        ervKWh: state.energy.ervKWh.toFixed(3),
+        batteryKWh: state.energy.batteryKWh.toFixed(3),
+        batteryPercent: getBatteryPercentage().toString(),
+        netKWh: state.energy.netKWh.toFixed(3),
+        energyBalance: energyBalance.toFixed(3),
+        comfort: state.comfortScore,
+        henriMode: simulationStore.currentMode,
+        hpEnabled: isModuleEnabled('heatPump'),
+        solarEnabled: isModuleEnabled('solar'),
+        batteryEnabled: isModuleEnabled('battery'),
+        timestamp: new Date().toISOString()
+    }
+    
+    // Check if this exact entry already exists (prevent duplicates)
+    const lastEntry = timeSeriesData.value[timeSeriesData.value.length - 1]
+    if (!lastEntry || 
+        lastEntry.hour !== logEntry.hour || 
+        lastEntry.timestamp !== logEntry.timestamp ||
+        Math.abs(parseFloat(lastEntry.solarKWh) - parseFloat(logEntry.solarKWh)) > 0.001) {
+        
+        timeSeriesData.value.push(logEntry)
+        console.log(`📊 Logged timestep ${logEntry.hour}:00 - Solar: ${logEntry.solarKWh} kWh, Battery: ${logEntry.batteryPercent}%`)
+        
+        // Keep only last 100 entries to prevent memory issues
+        if (timeSeriesData.value.length > 100) {
+            timeSeriesData.value = timeSeriesData.value.slice(-100)
+        }
+    }
+}
+
+const toggleAutoLogging = () => {
+    autoLogging.value = !autoLogging.value
+    if (autoLogging.value) {
+        console.log('%c📊 Auto-logging enabled - Time series data will be logged automatically', 'color: #16a34a; font-weight: bold;')
+        // Log current state immediately
+        logCurrentTimestep()
+    } else {
+        console.log('%c📊 Auto-logging disabled', 'color: #dc2626; font-weight: bold;')
+    }
+}
+
+const copyTimeSeriesData = () => {
+    const headers = ['Hour', 'TempOut', 'TempIn', 'SolarW/m²', 'SolarKWh', 'HeatPumpKWh', 'ERVkWh', 'BatteryKWh', 'Battery%', 'NetGridKWh', 'EnergyBalance', 'Comfort%', 'HenriMode', 'HPEnabled', 'SolarEnabled', 'BatteryEnabled', 'Timestamp']
+
+    const csvData = [
+        headers.join('\t'),
+        ...timeSeriesData.value.map(row => [
+            `${row.hour}:00`,
+            row.tempOut,
+            row.tempIn,
+            row.solarRadiation,
+            row.solarKWh,
+            row.heatPumpKWh,
+            row.ervKWh,
+            row.batteryKWh,
+            row.batteryPercent,
+            row.netKWh,
+            row.energyBalance,
+            row.comfort,
+            row.henriMode,
+            row.hpEnabled ? 'Y' : 'N',
+            row.solarEnabled ? 'Y' : 'N',
+            row.batteryEnabled ? 'Y' : 'N',
+            row.timestamp
+        ].join('\t'))
+    ].join('\n')
+
+    navigator.clipboard.writeText(csvData).then(() => {
+        console.log('%c📋 Time series data copied to clipboard (tab-separated)', 'color: #16a34a; font-weight: bold;')
+    }).catch(err => {
+        console.error('Failed to copy time series data:', err)
+        console.log('%c📋 Time Series Data (copy manually):', 'color: #dc2626; font-weight: bold;')
+        console.log(csvData)
+    })
+}
+
+const clearTimeSeriesData = () => {
+    timeSeriesData.value = []
+    console.log('%c🗑️ Time series data cleared', 'color: #6b7280; font-weight: bold;')
+}
+
+const exportTimeSeriesCSV = () => {
+    const headers = ['Hour', 'TempOut', 'TempIn', 'SolarW/m²', 'SolarKWh', 'HeatPumpKWh', 'ERVkWh', 'BatteryKWh', 'Battery%', 'NetGridKWh', 'EnergyBalance', 'Comfort%', 'HenriMode', 'HPEnabled', 'SolarEnabled', 'BatteryEnabled', 'Timestamp']
+
+    const csvData = [
+        headers.join(','),
+        ...timeSeriesData.value.map(row => [
+            `${row.hour}:00`,
+            row.tempOut,
+            row.tempIn,
+            row.solarRadiation,
+            row.solarKWh,
+            row.heatPumpKWh,
+            row.ervKWh,
+            row.batteryKWh,
+            row.batteryPercent,
+            row.netKWh,
+            row.energyBalance,
+            row.comfort,
+            row.henriMode,
+            row.hpEnabled ? 'Y' : 'N',
+            row.solarEnabled ? 'Y' : 'N',
+            row.batteryEnabled ? 'Y' : 'N',
+            row.timestamp
+        ].join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvData], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `henri-simulation-${new Date().toISOString().slice(0, 19)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    console.log('%c📄 CSV file downloaded', 'color: #16a34a; font-weight: bold;')
+}
+
+// Watch for simulation changes to auto-log
+
+// Watch for time changes to auto-log (this covers automatic playback)
+watch(() => simulationStore.houseState.time, (newTime, oldTime) => {
+    if (autoLogging.value && newTime !== oldTime) {
+        console.log(`⏰ Time changed from ${oldTime}:00 to ${newTime}:00 - logging timestep`)
+        // Use nextTick to ensure the simulation has completed
+        nextTick(() => {
+            logCurrentTimestep()
+        })
+    }
+})
+
+// Watch for energy changes (this covers manual simulation runs)
+watch(() => [
+    simulationStore.houseState.energy.solarKWh,
+    simulationStore.houseState.energy.batteryKWh,
+    simulationStore.houseState.energy.heatPumpKWh
+], () => {
+    if (autoLogging.value) {
+        console.log(`⚡ Energy state changed - logging timestep`)
+        // Use nextTick to ensure the simulation has completed
+        nextTick(() => {
+            logCurrentTimestep()
+        })
+    }
+})
 </script>
 
 <style scoped>
@@ -1329,6 +1593,180 @@ input:checked+.toggle-slider:before {
 
     .testing-controls {
         gap: 0.5rem;
+    }
+}
+
+/* Debug Data Table Styles */
+.debug-data-section {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: #ffffff;
+    border-radius: 0.75rem;
+    border: 2px solid #1f2937;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.debug-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #374151;
+}
+
+.debug-header h4 {
+    margin: 0;
+    color: #111827;
+    font-size: 1.25rem;
+    font-weight: 700;
+}
+
+.debug-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.timeseries-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.timeseries-info {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.75rem;
+    background: #f3f4f6;
+    border-radius: 0.5rem;
+    border: 1px solid #d1d5db;
+}
+
+.timeseries-info p {
+    margin: 0;
+    font-weight: 600;
+    color: #374151;
+}
+
+.timeseries-table-container {
+    overflow-x: auto;
+    background: white;
+    border-radius: 0.5rem;
+    border: 2px solid #374151;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.timeseries-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+}
+
+.timeseries-table th {
+    background-color: #1f2937;
+    color: #ffffff;
+    border: 1px solid #374151;
+    padding: 0.75rem 0.5rem;
+    text-align: left;
+    font-weight: 700;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+}
+
+.timeseries-table td {
+    border: 1px solid #d1d5db;
+    padding: 0.5rem;
+    font-weight: 600;
+    color: #111827;
+    background-color: #ffffff;
+    white-space: nowrap;
+}
+
+.timeseries-table tbody tr:nth-child(even) td {
+    background-color: #f9fafb;
+}
+
+.timeseries-table tbody tr:hover td {
+    background-color: #e5e7eb;
+}
+
+.timeseries-table tbody tr.current-hour td {
+    background-color: #dbeafe !important;
+    border-color: #3b82f6;
+    font-weight: 700;
+}
+
+.no-data {
+    text-align: center;
+    color: #6b7280;
+    font-style: italic;
+    background-color: #f9fafb !important;
+}
+
+/* Specific column styling for better readability */
+.timeseries-table td:nth-child(1) {
+    /* Hour */
+    background-color: #f3f4f6;
+    font-weight: 700;
+    color: #1f2937;
+}
+
+.timeseries-table td:nth-child(5),
+/* Solar kWh */
+.timeseries-table td:nth-child(6),
+/* Heat Pump kWh */
+.timeseries-table td:nth-child(7),
+/* ERV kWh */
+.timeseries-table td:nth-child(8),
+/* Battery kWh */
+.timeseries-table td:nth-child(10),
+/* Net Grid kWh */
+.timeseries-table td:nth-child(11) {
+    /* Energy Balance */
+    font-weight: 700;
+    color: #059669;
+}
+
+.timeseries-table td:nth-child(13) {
+    /* Henri Mode */
+    font-weight: 600;
+    color: #7c2d12;
+}
+
+.timeseries-table td:nth-child(14),
+/* HP Enabled */
+.timeseries-table td:nth-child(15),
+/* Solar Enabled */
+.timeseries-table td:nth-child(16) {
+    /* Battery Enabled */
+    font-weight: 700;
+    text-align: center;
+}
+
+@media (max-width: 768px) {
+    .debug-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: stretch;
+    }
+
+    .timeseries-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    .timeseries-table {
+        font-size: 0.75rem;
+    }
+
+    .timeseries-table th,
+    .timeseries-table td {
+        padding: 0.375rem 0.25rem;
     }
 }
 </style>
