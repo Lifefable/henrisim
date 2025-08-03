@@ -85,8 +85,8 @@ export function simulateERV(houseState: HouseState, timestepHours = 1, config?: 
   const energyUsed = fanPower * timestepHours
   energy.ervKWh += energyUsed
 
-  // Update net energy
-  energy.netKWh = energy.heatPumpKWh + energy.ervKWh - energy.solarKWh
+  // Don't update net energy here - let battery module handle final net calculation
+  // energy.netKWh = energy.heatPumpKWh + energy.ervKWh - energy.solarKWh
 
   return houseState
 }

@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref, computed, reactive } from 'vue'
 import type { HouseState, ModuleConfigs, SimulationModule, ClimateData } from '@/types/simulation'
+import type { EnergyBalanceComponents } from '@/types/energy-balance'
+import {
+  EnergyBalanceCalculator,
+  createDefaultBuildingZones,
+  createDefaultThermalBridges,
+} from '@/utils/energy-balance'
 
 // Default house state
 const createDefaultHouseState = (): HouseState => ({
@@ -36,7 +42,7 @@ const createDefaultHouseState = (): HouseState => ({
     heatPumpKWh: 0,
     ervKWh: 0,
     solarKWh: 0,
-    batteryKWh: 0,
+    batteryKWh: 5, // Start with some initial charge (25% of 20kWh capacity)
     netKWh: 0,
   },
 
@@ -71,6 +77,13 @@ export const useSimulationStore = defineStore('simulation', () => {
     startTime: number
   } | null>(null)
 
+  // Enhanced Energy Balance System
+  const energyBalanceCalculator = new EnergyBalanceCalculator(
+    createDefaultBuildingZones(),
+    createDefaultThermalBridges(),
+  )
+  const currentEnergyBalance = ref<EnergyBalanceComponents | null>(null)
+
   // Module configurations
   const moduleConfigs = reactive<ModuleConfigs>({
     heatPump: {
@@ -94,6 +107,7 @@ export const useSimulationStore = defineStore('simulation', () => {
       houseState.energy.heatPumpKWh + houseState.energy.ervKWh + (houseState.energy.iaqKWh || 0),
   )
   const netEnergyFlow = computed(() => houseState.energy.solarKWh - totalEnergyUsed.value)
+  const energyBalance = computed(() => currentEnergyBalance.value)
 
   // Actions
   const setTime = (hour: number) => {
@@ -118,6 +132,8 @@ export const useSimulationStore = defineStore('simulation', () => {
     const module = modules.value.find((m) => m.name === moduleName)
     if (module) {
       module.enabled = !module.enabled
+      // Re-run simulation to update energy balance
+      runSimulation()
     }
   }
 
@@ -246,11 +262,111 @@ export const useSimulationStore = defineStore('simulation', () => {
     console.log('')
   }
 
+  // === PASSIVE PHYSICS SIMULATION ===
+
+  /**
+   * Apply passive house physics that continue regardless of system status
+   * This includes heat loss, air quality degradation, humidity changes, etc.
+   */
+  const applyPassivePhysics = (timestepHours = 1) => {
+    const { indoor, outdoor, envelope } = houseState
+
+    // 1. Heat Loss/Gain through building envelope (always applies)
+    const tempDiff = indoor.temperature - outdoor.temperature
+
+    // Calculate heat loss through walls, roof, floor
+    const wallLoss = (tempDiff / envelope.wallR) * envelope.floorArea * 0.6 * timestepHours
+    const roofLoss = (tempDiff / envelope.roofR) * envelope.floorArea * timestepHours
+    const floorLoss = (tempDiff / envelope.floorR) * envelope.floorArea * timestepHours
+
+    // Heat loss through windows
+    const windowLoss = tempDiff * envelope.windowU * envelope.windowArea * timestepHours
+
+    // Infiltration heat loss/gain
+    const airDensity = 1.2 // kg/m³
+    const specificHeat = 1.005 // kJ/kg·K
+    const houseVolume = envelope.floorArea * 2.5 // Assume 2.5m ceiling height
+    const infiltrationFlow = (envelope.infiltrationRate * houseVolume) / 3600 // m³/s
+    const infiltrationLoss = tempDiff * airDensity * specificHeat * infiltrationFlow * timestepHours
+
+    const totalHeatLoss = wallLoss + roofLoss + floorLoss + windowLoss + infiltrationLoss
+
+    // Apply temperature change due to heat loss (no heating/cooling compensation)
+    const thermalMass = envelope.floorArea * 0.3 // Simplified thermal mass calculation
+    const temperatureChange = totalHeatLoss / thermalMass
+    indoor.temperature -= temperatureChange
+
+    // 2. Solar heat gain (if no cooling system to compensate)
+    const isHeatPumpEnabled = modules.value.find((m) => m.name === 'heatPump')?.enabled
+    if (!isHeatPumpEnabled && outdoor.solarRadiation > 200) {
+      // Solar heat gain through windows
+      const solarHeatGain =
+        (outdoor.solarRadiation * envelope.windowArea * 0.7 * timestepHours) / 1000 // kW
+      const solarTempIncrease = solarHeatGain / thermalMass
+      indoor.temperature += solarTempIncrease
+    }
+
+    // 3. Air quality degradation without ERV
+    const isERVEnabled = modules.value.find((m) => m.name === 'erv')?.enabled
+    if (!isERVEnabled) {
+      // Air quality degrades over time without ventilation
+      const degradationRate = 0.02 * timestepHours // 2% per hour
+      indoor.airQuality = Math.max(0.3, indoor.airQuality - degradationRate)
+
+      // Humidity tends toward outdoor levels without ERV
+      const humidityDrift = (outdoor.humidity - indoor.humidity) * 0.1 * timestepHours
+      indoor.humidity += humidityDrift
+    }
+
+    // 4. Natural limits and constraints
+    // Temperature can't go below outdoor temp (house acts as thermal mass)
+    if (tempDiff > 0 && indoor.temperature < outdoor.temperature) {
+      indoor.temperature = Math.max(indoor.temperature, outdoor.temperature - 5)
+    }
+
+    // Humidity constraints
+    indoor.humidity = Math.max(0.2, Math.min(0.8, indoor.humidity))
+
+    // Air quality can't improve without systems
+    indoor.airQuality = Math.max(0.3, Math.min(1.0, indoor.airQuality))
+  }
+
   const runSimulation = (timestepHours = 1) => {
     const startTime = performance.now()
 
     // Save current state to history
     saveToHistory()
+
+    // Reset ALL energy values to zero at start of each timestep (except battery charge level)
+    const previousBatteryLevel = houseState.energy.batteryKWh
+    houseState.energy.heatPumpKWh = 0
+    houseState.energy.ervKWh = 0
+    houseState.energy.solarKWh = 0
+    houseState.energy.netKWh = 0
+    houseState.energy.batteryKWh = previousBatteryLevel // Preserve battery charge level
+
+    // Reset energy values for disabled modules to zero (redundant but explicit)
+    const disabledModules = modules.value.filter((m) => !m.enabled)
+    for (const module of disabledModules) {
+      switch (module.name) {
+        case 'heatPump':
+          houseState.energy.heatPumpKWh = 0
+          break
+        case 'erv':
+          houseState.energy.ervKWh = 0
+          break
+        case 'solar':
+          houseState.energy.solarKWh = 0
+          break
+        case 'battery':
+          // For battery, we might want to maintain stored energy but stop charging/discharging
+          // Only reset if we want to simulate complete disconnection
+          break
+      }
+    }
+
+    // Apply passive house physics first (always runs regardless of module status)
+    applyPassivePhysics(timestepHours)
 
     // Henri's adaptive analysis - analyze environment first
     const preAnalysisState = JSON.parse(JSON.stringify(houseState))
@@ -299,6 +415,12 @@ export const useSimulationStore = defineStore('simulation', () => {
 
     const endTime = performance.now()
     logSimulationCycle(startTime, endTime)
+
+    // Calculate detailed energy balance
+    currentEnergyBalance.value = energyBalanceCalculator.calculateEnergyBalance(
+      houseState,
+      timestepHours,
+    )
 
     // Update comfort score
     updateComfortScore()
@@ -678,6 +800,7 @@ export const useSimulationStore = defineStore('simulation', () => {
     isComfortable,
     totalEnergyUsed,
     netEnergyFlow,
+    energyBalance,
 
     // Actions
     setTime,

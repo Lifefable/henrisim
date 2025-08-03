@@ -1,240 +1,339 @@
-Henri Home Simulation Spec (Extended for Passive House Components)
+# Henri Home Passive House Simulation - Technical Specification v2.0
 
-Overview
+## Overview
 
-This spec defines the Henri Home Simulation Framework for a Vue 3 scaffold, modeling a Passive House/Henri home with modular environmental systems. It is modular and extensible, starting with core components and allowing additional Passive House elements to be added.
+The Henri Home Simulation is a comprehensive Vue 3 web application that models a high-performance passive house with adaptive environmental systems. Built on a modular architecture, it simulates thermal dynamics, energy flows, air quality, and comfort metrics with real-time physics-based calculations.
 
-Core Modules (Initial Implementation):
+## Architecture Summary
 
-Heat Pump Module (primary) – drives indoor temperature & energy consumption.
+**Framework**: Vue 3 with Composition API and TypeScript  
+**State Management**: Pinia stores with reactive simulation engine  
+**Physics Engine**: Passive house physics with PHI-compliant energy balance calculations  
+**Adaptive Intelligence**: Henri's decision engine with environmental response algorithms  
+**Visualization**: Real-time charts and interactive module controls
 
-ERV Module (secondary) – drives air quality & minor thermal effects.
+## Core Implemented Systems
 
-Extensible Modules (Future):
+### 1. Heat Pump Module ✅ IMPLEMENTED
 
-Solar Module – provides solar power and passive heat gains.
+**Purpose**: Primary heating/cooling system with adaptive temperature control  
+**Physics**: COP-based energy consumption, thermal mass calculations  
+**Configuration**:
 
-Battery Module – tracks energy storage and discharges to offset grid usage.
+- Target temperature: 19-21°C (adaptive)
+- COP: 2.8-4.0 (adaptive based on conditions)
+- Capacity: 12 kW maximum
 
-Window Shading Module – reduces solar heat gain and influences cooling load.
+**Key Features**:
 
-IAQ Filter Module – adjusts indoor air quality when filtration is active.
+- Automatic heating/cooling mode selection
+- Energy efficiency optimization
+- Integration with passive heat loss calculations
+- Adaptive COP adjustment based on outdoor conditions
 
-Sprinkler/Structure Protection Module – models energy and water use for fire safety events.
+### 2. ERV (Energy Recovery Ventilation) Module ✅ IMPLEMENTED
 
-Simulation Goals
+**Purpose**: Air quality management with thermal energy recovery  
+**Physics**: Heat recovery efficiency, humidity exchange, fan power consumption  
+**Configuration**:
 
-Simulate one day in hourly increments (0–23h) at a set latitude/longitude (default: Denver).
+- Heat recovery efficiency: 70-80% (adaptive)
+- Flow rate: 200-400 m³/h (adaptive)
+- Fan power: 150W (variable for emergency modes)
 
-Update a reactive houseState object representing indoor climate, energy use, and comfort.
+**Key Features**:
 
-Allow modular simulation of:
+- Outdoor air quality assessment and filtration strategy
+- Emergency smoke evacuation mode (2x flow rate)
+- Humidity control and thermal recovery
+- Adaptive efficiency based on outdoor conditions
 
-Thermal dynamics (heat pump, window heat gain/loss)
+### 3. Solar PV Module ✅ IMPLEMENTED
 
-Air quality (ERV, IAQ filters)
+**Purpose**: Renewable energy generation with passive solar heat gain  
+**Physics**: Solar radiation to electricity conversion, window heat gain  
+**Configuration**:
 
-Energy flow (solar, battery, grid draw)
+- Panel area: 40 m²
+- Panel efficiency: 20%
+- Inverter efficiency: 95%
+- Window solar heat gain coefficient: 0.4
 
-Safety events (smoke or heat triggering sprinklers or intake closure)
+**Key Features**:
 
-Data Model (Base)
+- Time-based solar radiation modeling (sin wave pattern)
+- Passive heat gain through windows
+- Real-time energy generation tracking
+- Integration with battery storage system
 
-export default {
-time: 0, // 0–23 hours
-date: '2025-06-21', // simulation date
-location: { lat: 39.7392, lon: -104.9903 }, // Denver
+### 4. Battery Storage Module ✅ IMPLEMENTED
 
-outdoor: {
-temperature: 0, // °C
-humidity: 0.45, // fraction
-solarRadiation: 0, // W/m²
-airQualityIndex: 50, // AQI
-windSpeed: 2 // m/s (for future modules)
-},
+**Purpose**: Energy storage and grid interaction management  
+**Physics**: Charge/discharge cycles, round-trip efficiency, capacity management  
+**Configuration**:
 
-indoor: {
-temperature: 21, // °C
-humidity: 0.40,
-airQuality: 0.9 // 0–1 normalized
-},
+- Capacity: 20 kWh
+- Charge/discharge rate: 5 kW
+- Round-trip efficiency: 90%
+- Initial charge: 25% (5 kWh)
 
-envelope: {
-floorArea: 150, // m²
-wallR: 5.0, // m²*K/W
-roofR: 7.0,
-floorR: 4.0,
-windowU: 0.8, // W/m²*K
-windowArea: 20, // m²
-infiltrationRate: 0.3 // ACH
-},
+**Key Features**:
 
-energy: {
-heatPumpKWh: 0,
-ervKWh: 0,
-solarKWh: 0,
-batteryKWh: 0,
-netKWh: 0
-},
+- Excess solar energy storage
+- Automatic charge/discharge based on energy balance
+- Grid export/import optimization
+- State of charge persistence when disabled
+- **Fixed**: Energy value accumulation bug preventing charging (v2.1)
 
-safety: {
-sprinklersActive: false,
-smokeEvent: false
-},
+### 5. Passive Physics Engine ✅ IMPLEMENTED
 
-comfortScore: 100
-};
+**Purpose**: Continuous building physics simulation regardless of system status  
+**Physics**: Heat loss through envelope, air quality degradation, natural ventilation
 
-Core Module Interfaces
+**Key Calculations**:
 
-Signature:
+- **Heat Loss**: Wall, roof, floor, window, and infiltration losses
+- **Thermal Mass**: Building thermal inertia effects
+- **Air Quality Degradation**: Natural decline without ventilation (2%/hour)
+- **Solar Heat Gain**: Passive heating through windows
+- **Humidity Migration**: Natural drift toward outdoor conditions
 
-function simulateModule(houseState, timestepHours = 1) -> houseState
+### 6. Henri's Adaptive Intelligence ✅ IMPLEMENTED
+
+**Purpose**: AI-driven optimization and environmental response  
+**Modes**:
+
+- **Normal**: Standard efficient operation
+- **Emergency**: Smoke/safety event response
+- **Energy-Saving**: Low battery conservation mode
+- **Comfort-Priority**: Temperature/comfort optimization
+- **High-Solar**: Solar heat gain management
+
+**Decision Making**:
+
+- Real-time environmental analysis
+- Predictive adaptation planning
+- System efficiency optimization
+- Emergency protocol activation
+
+### 7. Energy Balance Analysis ✅ IMPLEMENTED
+
+**Purpose**: PHI-compliant building energy analysis with calibration charts  
+**Standards**: Passive House Institute (PHI) methodology  
+**Visualizations**:
+
+- Winter/Summer analysis toggle
+- Stacked bar charts showing:
+  - Heat losses (transmission, ventilation, thermal bridges)
+  - Heat gains (solar, internal, auxiliary heating)
+- Proportional height scaling for accurate comparison
+
+## Data Model (TypeScript Interfaces)
+
+```typescript
+interface HouseState {
+  time: number // 0-23 hours
+  date: string // YYYY-MM-DD format
+  location: Location // Denver coordinates
+  outdoor: OutdoorConditions // Weather data
+  indoor: IndoorConditions // Internal environment
+  envelope: BuildingEnvelope // Building specifications
+  energy: EnergyState // All energy flows
+  safety: SafetyState // Emergency status
+  comfortScore: number // 0-100 comfort metric
+}
+
+interface EnergyState {
+  heatPumpKWh: number // Heat pump consumption
+  ervKWh: number // ERV fan consumption
+  solarKWh: number // Solar generation
+  batteryKWh: number // Battery charge level
+  netKWh: number // Grid import/export
+}
 
-1. Heat Pump Module (HeatPumpModule.js)
+interface BuildingEnvelope {
+  floorArea: 150 // m² (passive house optimized)
+  wallR: 5.0 // m²·K/W (high insulation)
+  roofR: 7.0 // m²·K/W
+  floorR: 4.0 // m²·K/W
+  windowU: 0.8 // W/m²·K (triple glazed)
+  windowArea: 20 // m²
+  infiltrationRate: 0.3 // ACH (very tight)
+}
+```
 
-Calculates heat loss/gain and energy use.
+## Simulation Flow & Architecture
+
+### 1. Time Control System
 
-Adjusts indoor temperature toward target.
+- **Manual Control**: Hour slider (0-23)
+- **Automatic Playback**: Continuous simulation with pause/play
+- **Climate Updates**: Solar radiation and temperature cycles
 
-2. ERV Module (ERVModule.js)
+### 2. Physics Simulation Pipeline
 
-Improves indoor air quality toward 1.0.
+```
+1. Apply Passive Physics (always runs)
+   ├── Heat loss calculations
+   ├── Air quality degradation
+   └── Natural thermal effects
 
-Adds small energy cost for fans.
+2. Henri's Environmental Analysis
+   ├── Current condition assessment
+   ├── Mode switching logic
+   └── Predictive adaptation
 
-Recovers ~30% of thermal difference.
+3. Run Enabled Modules (in order)
+   ├── Heat Pump (temperature control)
+   ├── ERV (air quality + thermal recovery)
+   ├── Solar (energy generation)
+   └── Battery (energy storage)
 
-Extensible Passive House Modules
+4. Calculate Energy Balance
+   ├── PHI-compliant analysis
+   ├── Chart visualization updates
+   └── Comfort score calculation
+```
 
-3. Solar Module (SolarModule.js)
+### 3. Module State Management
 
-Function:
+- **Enabled Modules**: Full functionality with energy tracking
+- **Disabled Modules**:
+  - Energy consumption/generation = 0
+  - Physical effects removed (no heating, no air quality improvement)
+  - State preservation (battery maintains charge level)
+  - Passive physics continue (heat loss, air quality degradation)
 
-Generates solar energy based on solarRadiation and panelArea.
+## User Interface Components
 
-Adds passive heat gain proportional to window area and orientation.
+### Core Interface ✅ IMPLEMENTED
 
-Outputs:
+- **Time Control Panel**: Hour slider, play/pause, reset controls
+- **Environmental Overview**: Temperature, humidity, air quality, solar metrics
+- **System Status Grid**: Module cards with real-time status indicators
+- **Henri's Decision Engine**: Current mode, recent decisions, next adaptations
+- **Testing Scenarios**: Environmental stress tests and time controls
 
-energy.solarKWh increase
+### Module Status Cards ✅ IMPLEMENTED
 
-Optional small bump in indoor.temperature
+Each module displays:
 
-4. Battery Module (BatteryModule.js)
+- **Visual Status**: 🟢 ACTIVE / 🔴 OFF indicators
+- **Toggle Control**: Enable/disable switch
+- **Real-time Metrics**: Energy consumption, efficiency, operational parameters
+- **Visual Feedback**: Disabled state styling (dimmed, gray background)
 
-Function:
+### Energy Balance Visualization ✅ IMPLEMENTED
 
-Stores excess solar energy and offsets grid energy use.
+- **Interactive Charts**: Winter/Summer analysis toggle
+- **PHI Compliance**: Matches passive house calibration methodology
+- **Real-time Updates**: Responds to module state changes
+- **Proportional Scaling**: Accurate energy magnitude representation
 
-Simple charge/discharge cycle per hour.
+## Testing & Scenarios ✅ IMPLEMENTED
 
-Outputs:
+### Environmental Tests
 
-energy.batteryKWh current state of charge
+- **Heat Wave**: High temperature stress testing
+- **Cold Snap**: Extreme cold response
+- **Poor Air Quality**: Air filtration challenges
 
-Adjusted energy.netKWh
+### Energy Tests
 
-5. Window Shading Module (WindowShadingModule.js)
+- **Low Battery**: Energy conservation modes
+- **Power Outage**: Grid independence testing
 
-Function:
+### Safety Tests
 
-Dynamically adjusts solar heat gain and glare.
+- **Smoke Alarm**: Emergency ventilation protocols
+- **Comfort Challenge**: Multi-factor stress testing
 
-Reduces cooling load during high radiation hours.
+### Time Controls
 
-Outputs:
+- **Morning (06:00)**: Low solar, heating demand
+- **Noon (12:00)**: Peak solar, potential cooling needs
+- **Evening (18:00)**: Declining solar, energy storage utilization
 
-Modifies indoor.temperature gain from solar
+## Performance & Telemetry ✅ IMPLEMENTED
 
-Can optionally feed a comfortScore improvement
+### Advanced Logging System
 
-6. IAQ Filter Module (IAQFilterModule.js)
+- **Henri Decision Cycles**: AI reasoning transparency
+- **Module Performance**: Individual system analysis
+- **Energy Efficiency Metrics**: COP tracking, energy flows
+- **Environmental Analysis**: Condition assessment and responses
+- **Execution Timing**: Performance monitoring and optimization
 
-Function:
+### Real-time Metrics
 
-Improves indoor air quality beyond ERV limits.
+- **Temperature Error**: Deviation from target temperature
+- **Comfort Trends**: Score changes over time
+- **Energy Efficiency**: System performance indicators
+- **Module Status**: Active/inactive state tracking
 
-Uses fan energy, can detect smoke event and seal intakes.
+## Technical Implementation
 
-Outputs:
+### Module Architecture
 
-Improved indoor.airQuality
+```typescript
+interface SimulationModule {
+  name: string
+  enabled: boolean
+  simulate: (houseState: HouseState, timestepHours?: number, config?: any) => HouseState
+}
+```
 
-energy.iaqKWh increment per hour
+### Energy Flow Management
 
-Can toggle safety.smokeEvent
+- **Single Source of Truth**: Battery module calculates final net energy
+- **Conflict Prevention**: Individual modules don't override net calculations
+- **Energy Balance**: `netKWh = consumption - generation - battery_discharge`
 
-7. Sprinkler/Structure Protection Module (SprinklerModule.js)
+### State Persistence
 
-Function:
+- **Module States**: Enabled/disabled status maintained
+- **Battery Charge**: Preserves energy level when disabled
+- **Configuration**: Adaptive parameters saved across sessions
 
-Activates when safety.smokeEvent or heat event occurs.
+## Future Extensibility
 
-Tracks water and energy usage for pumps.
+### Planned Enhancements
 
-Outputs:
+- **Window Shading Module**: Dynamic solar heat gain control
+- **IAQ Filter Module**: Advanced air purification systems
+- **Thermal Mass Module**: Enhanced building thermal modeling
+- **Weather Integration**: Real weather data API connection
+- **Historical Analysis**: Multi-day simulation and trending
 
-safety.sprinklersActive = true
+### API Integration Points
 
-Optional: comfortScore penalty
+- **Weather Services**: Real-time climate data
+- **Energy Markets**: Grid pricing and demand response
+- **Building Management**: IoT sensor integration
+- **Performance Monitoring**: Long-term efficiency tracking
 
-Component Structure
+## Validation & Compliance
 
-/src
-/components
-HouseSimulation.vue # Parent orchestrator with slider
-SidePanel.vue # Shows module I/O cards
-HeatPumpModule.vue # UI card for heat pump status
-ERVModule.vue # UI card for ERV status
-SolarModule.vue
-BatteryModule.vue
-WindowShadingModule.vue
-IAQFilterModule.vue
-SprinklerModule.vue
-/modules
-houseState.js
-HeatPumpModule.js
-ERVModule.js
-SolarModule.js
-BatteryModule.js
-WindowShadingModule.js
-IAQFilterModule.js
-SprinklerModule.js
-ClimateEngine.js
+### Building Standards
 
-Simulation Flow
+- **Passive House Institute (PHI)**: Energy balance methodology compliance
+- **ASHRAE Standards**: HVAC system modeling accuracy
+- **Building Energy Codes**: Envelope performance validation
 
-Slider Event → simulateHour(hour)
+### Simulation Accuracy
 
-Update Climate: from ClimateEngine
+- **Physics Validation**: Heat transfer, thermodynamics, fluid dynamics
+- **Energy Balance**: Conservation of energy principles
+- **System Integration**: Module interaction verification
+- **Performance Benchmarking**: Real building data comparison
 
-Run Modules in Order:
+### Recent Bug Fixes (v2.1)
 
-HeatPumpModule
+- **Battery Charging Issue**: Fixed energy value accumulation preventing battery charging
+  - **Problem**: Energy values accumulated over timesteps instead of resetting
+  - **Solution**: Reset all energy flows at start of each simulation timestep
+  - **Impact**: Battery now charges properly from excess solar generation
 
-ERVModule
+---
 
-SolarModule
-
-BatteryModule
-
-WindowShadingModule
-
-IAQFilterModule
-
-SprinklerModule
-
-Update houseState and propagate to UI components.
-
-Next Steps
-
-Implement Heat Pump + ERV + Side Panel.
-
-Add synthetic solar + shading to visualize thermal and energy flows.
-
-Integrate IAQ Filter & Safety Modules for smoke/fire scenarios.
-
-Implement charts for temperature, AQ, and energy usage over 24h.
-
-Enable module toggling for feature demonstrations.
+_This specification reflects the current implementation as of the Henri Home Simulation v2.1, including all major systems, adaptive intelligence, energy balance analysis, and critical bug fixes._

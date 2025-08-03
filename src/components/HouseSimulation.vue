@@ -127,14 +127,19 @@
                     <h3>System Status</h3>
                     <div class="modules-grid">
                         <!-- Heat Pump Module -->
-                        <div class="module-card">
+                        <div class="module-card" :class="{ 'module-disabled': !isModuleEnabled('heatPump') }">
                             <div class="module-header">
                                 <h4>🔥 Heat Pump</h4>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" :checked="isModuleEnabled('heatPump')"
-                                        @change="toggleModule('heatPump')" />
-                                    <span class="toggle-slider"></span>
-                                </label>
+                                <div class="module-status">
+                                    <span class="status-indicator" :class="{ 'active': isModuleEnabled('heatPump') }">
+                                        {{ isModuleEnabled('heatPump') ? '🟢 ACTIVE' : '🔴 OFF' }}
+                                    </span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" :checked="isModuleEnabled('heatPump')"
+                                            @change="toggleModule('heatPump')" />
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
                             </div>
                             <div class="module-content">
                                 <div class="module-stat">
@@ -154,14 +159,19 @@
                         </div>
 
                         <!-- ERV Module -->
-                        <div class="module-card">
+                        <div class="module-card" :class="{ 'module-disabled': !isModuleEnabled('erv') }">
                             <div class="module-header">
                                 <h4>💨 ERV System</h4>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" :checked="isModuleEnabled('erv')"
-                                        @change="toggleModule('erv')" />
-                                    <span class="toggle-slider"></span>
-                                </label>
+                                <div class="module-status">
+                                    <span class="status-indicator" :class="{ 'active': isModuleEnabled('erv') }">
+                                        {{ isModuleEnabled('erv') ? '🟢 ACTIVE' : '🔴 OFF' }}
+                                    </span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" :checked="isModuleEnabled('erv')"
+                                            @change="toggleModule('erv')" />
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
                             </div>
                             <div class="module-content">
                                 <div class="module-stat">
@@ -180,14 +190,19 @@
                         </div>
 
                         <!-- Solar Module -->
-                        <div class="module-card">
+                        <div class="module-card" :class="{ 'module-disabled': !isModuleEnabled('solar') }">
                             <div class="module-header">
                                 <h4>☀️ Solar Panels</h4>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" :checked="isModuleEnabled('solar')"
-                                        @change="toggleModule('solar')" />
-                                    <span class="toggle-slider"></span>
-                                </label>
+                                <div class="module-status">
+                                    <span class="status-indicator" :class="{ 'active': isModuleEnabled('solar') }">
+                                        {{ isModuleEnabled('solar') ? '🟢 ACTIVE' : '🔴 OFF' }}
+                                    </span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" :checked="isModuleEnabled('solar')"
+                                            @change="toggleModule('solar')" />
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
                             </div>
                             <div class="module-content">
                                 <div class="module-stat">
@@ -207,14 +222,19 @@
                         </div>
 
                         <!-- Battery Module -->
-                        <div class="module-card">
+                        <div class="module-card" :class="{ 'module-disabled': !isModuleEnabled('battery') }">
                             <div class="module-header">
                                 <h4>🔋 Battery Storage</h4>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" :checked="isModuleEnabled('battery')"
-                                        @change="toggleModule('battery')" />
-                                    <span class="toggle-slider"></span>
-                                </label>
+                                <div class="module-status">
+                                    <span class="status-indicator" :class="{ 'active': isModuleEnabled('battery') }">
+                                        {{ isModuleEnabled('battery') ? '🟢 ACTIVE' : '🔴 OFF' }}
+                                    </span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" :checked="isModuleEnabled('battery')"
+                                            @change="toggleModule('battery')" />
+                                        <span class="toggle-slider"></span>
+                                    </label>
+                                </div>
                             </div>
                             <div class="module-content">
                                 <div class="module-stat">
@@ -373,6 +393,20 @@
                     </div>
                 </div>
 
+                <!-- Energy Balance Chart -->
+                <div class="energy-balance-section">
+                    <div v-if="simulationStore.energyBalance">
+                        <EnergyBalanceChart :energy-balance="simulationStore.energyBalance" />
+                    </div>
+                    <div v-else class="energy-balance-loading">
+                        <h3>Energy Balance Analysis</h3>
+                        <p>Loading energy balance calculations...</p>
+                        <p><strong>Debug:</strong> Energy balance is {{ simulationStore.energyBalance }}</p>
+                        <button @click="simulationStore.runSimulation()" class="base-button">Trigger
+                            Calculation</button>
+                    </div>
+                </div>
+
                 <!-- Safety Panel -->
                 <div v-if="simulationStore.houseState.safety.smokeEvent || simulationStore.houseState.safety.sprinklersActive"
                     class="safety-panel alert">
@@ -400,6 +434,7 @@ import { createERVModule } from '@/modules/ERVModule'
 import { createSolarModule } from '@/modules/SolarModule'
 import { createBatteryModule } from '@/modules/BatteryModule'
 import BaseButton from '@/components/ui/BaseButton.vue'
+import EnergyBalanceChart from '@/components/EnergyBalanceChart.vue'
 
 const simulationStore = useSimulationStore()
 
@@ -415,6 +450,9 @@ onMounted(() => {
     simulationStore.addModule(createERVModule())
     simulationStore.addModule(createSolarModule())
     simulationStore.addModule(createBatteryModule())
+
+    // Run initial simulation to populate energy balance
+    simulationStore.runSimulation()
 })
 
 // Methods
@@ -905,17 +943,16 @@ const clearConsole = () => {
 }
 
 .module-card {
-    border: 1px solid #e2e8f0;
-    border-radius: 0.5rem;
-    padding: 0.75rem;
-    background: #f8fafc;
-    transition: all 0.2s ease;
+    background: white;
+    border-radius: 8px;
+    padding: 1rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
 }
 
-.module-card:hover {
-    border-color: #cbd5e1;
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+.module-card.module-disabled {
+    opacity: 0.6;
+    background: #f5f5f5;
 }
 
 .module-header {
@@ -926,10 +963,34 @@ const clearConsole = () => {
 }
 
 .module-header h4 {
-    color: #0f172a;
-    font-size: 1rem;
+    color: #1f2937;
     font-weight: 700;
-    margin: 0;
+    font-size: 1rem;
+}
+
+.module-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-indicator {
+    font-size: 0.8rem;
+    font-weight: bold;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    background: #f0f0f0;
+    transition: all 0.3s ease;
+}
+
+.status-indicator.active {
+    background: #e8f5e8;
+    color: #2d7a2d;
+}
+
+.status-indicator:not(.active) {
+    background: #ffe6e6;
+    color: #a63333;
 }
 
 .toggle-switch {
@@ -1229,6 +1290,30 @@ input:checked+.toggle-slider:before {
     .scenario-details {
         margin-bottom: 0.5rem;
     }
+}
+
+/* Energy Balance Section */
+.energy-balance-section {
+    margin-top: 1.5rem;
+}
+
+.energy-balance-loading {
+    padding: 1rem;
+    background: #f9fafb;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.energy-balance-loading h3 {
+    color: #374151;
+    margin-bottom: 0.5rem;
+}
+
+.energy-balance-loading p {
+    color: #6b7280;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
 }
 
 @media (max-width: 480px) {

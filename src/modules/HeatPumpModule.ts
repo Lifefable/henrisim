@@ -2,8 +2,8 @@ import type { HouseState } from '@/types/simulation'
 
 /**
  * Heat Pump Module
- * Calculates heat loss/gain and energy consumption
- * Adjusts indoor temperature toward target
+ * Calculates heating/cooling energy consumption and maintains target temperature
+ * NOTE: Heat loss is now handled by passive physics in the main simulation
  */
 export function simulateHeatPump(
   houseState: HouseState,
@@ -16,9 +16,6 @@ export function simulateHeatPump(
   const targetTemp = 21 // Default target, should come from config
   const heatPumpCOP = 3.5 // Coefficient of Performance
   const heatPumpCapacity = 12 // kW maximum capacity
-
-  // Calculate heat loss through building envelope
-  const heatLoss = calculateHeatLoss(indoor, outdoor, envelope)
 
   // Calculate required heating/cooling to reach target
   const tempDifference = targetTemp - indoor.temperature
@@ -45,51 +42,18 @@ export function simulateHeatPump(
     if (isCooling) {
       temperatureChange = -temperatureChange
     }
+
+    // Apply temperature change from heat pump operation
+    indoor.temperature += temperatureChange
   }
-
-  // Apply heat loss
-  const heatLossEffect = (heatLoss * timestepHours) / (envelope.floorArea * 0.3)
-
-  // Update indoor temperature
-  indoor.temperature += temperatureChange - heatLossEffect
 
   // Update energy consumption
   energy.heatPumpKWh += energyUsed
 
-  // Update net energy
-  energy.netKWh = energy.heatPumpKWh + energy.ervKWh - energy.solarKWh
+  // Don't update net energy here - let battery module handle final net calculation
+  // energy.netKWh = energy.heatPumpKWh + energy.ervKWh - energy.solarKWh
 
   return houseState
-}
-
-/**
- * Calculate heat loss through building envelope
- */
-function calculateHeatLoss(
-  indoor: HouseState['indoor'],
-  outdoor: HouseState['outdoor'],
-  envelope: HouseState['envelope'],
-): number {
-  const tempDiff = indoor.temperature - outdoor.temperature
-
-  // Heat loss through walls, roof, floor (simplified)
-  const wallLoss = (tempDiff / envelope.wallR) * envelope.floorArea * 0.6 // Assume 60% wall area
-  const roofLoss = (tempDiff / envelope.roofR) * envelope.floorArea
-  const floorLoss = (tempDiff / envelope.floorR) * envelope.floorArea
-
-  // Heat loss through windows
-  const windowLoss = tempDiff * envelope.windowU * envelope.windowArea
-
-  // Infiltration heat loss
-  const airDensity = 1.2 // kg/m³
-  const specificHeat = 1.005 // kJ/kg·K
-  const houseVolume = envelope.floorArea * 2.5 // Assume 2.5m ceiling height
-  const infiltrationFlow = (envelope.infiltrationRate * houseVolume) / 3600 // m³/s
-  const infiltrationLoss = tempDiff * airDensity * specificHeat * infiltrationFlow
-
-  const totalHeatLoss = wallLoss + roofLoss + floorLoss + windowLoss + infiltrationLoss
-
-  return Math.max(0, totalHeatLoss) // Heat loss, not gain
 }
 
 /**

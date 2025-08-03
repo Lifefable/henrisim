@@ -2,7 +2,7 @@ import type { HouseState } from '@/types/simulation'
 
 /**
  * Battery Module
- * Stores excess solar energy and offsets grid energy use
+ * Stores excess solar energy and provides energy when needed
  * Simple charge/discharge cycle per hour
  */
 export function simulateBattery(
@@ -19,51 +19,45 @@ export function simulateBattery(
   const efficiency = 0.9 // 90% round-trip efficiency
 
   // Calculate current energy balance (excluding battery)
-  const energyNeeded = energy.heatPumpKWh + energy.ervKWh + (energy.iaqKWh || 0)
-  const energyAvailable = energy.solarKWh
-  const energyBalance = energyAvailable - energyNeeded
+  const energyConsumed = energy.heatPumpKWh + energy.ervKWh
+  const energyGenerated = energy.solarKWh
+  const energyBalance = energyGenerated - energyConsumed
 
-  // Current battery state (use existing batteryKWh as state of charge)
+  // Current battery state - maintain charge level even when disabled
   let currentCharge = energy.batteryKWh
+  let batteryEnergyFlow = 0 // Track energy flowing in/out of battery
 
   if (energyBalance > 0) {
     // Excess energy available - charge battery
     const maxChargeAmount = Math.min(
-      energyBalance * efficiency, // Available excess energy
+      energyBalance, // Available excess energy
       chargeRate * timestepHours, // Charge rate limit
       batteryCapacity - currentCharge, // Remaining battery capacity
     )
-    currentCharge += maxChargeAmount
-  } else if (energyBalance < 0) {
-    // Energy deficit - discharge battery
+
+    const actualChargeAmount = maxChargeAmount * efficiency
+    currentCharge += actualChargeAmount
+    batteryEnergyFlow = actualChargeAmount // Positive = charging
+  } else if (energyBalance < 0 && currentCharge > 0) {
+    // Energy deficit and battery has charge - discharge battery
     const energyDeficit = Math.abs(energyBalance)
     const maxDischargeAmount = Math.min(
       energyDeficit, // Energy needed
       dischargeRate * timestepHours, // Discharge rate limit
       currentCharge, // Available battery charge
     )
-    currentCharge -= maxDischargeAmount
 
-    // Discharged energy reduces net consumption
-    energy.netKWh -= maxDischargeAmount
+    currentCharge -= maxDischargeAmount
+    batteryEnergyFlow = -maxDischargeAmount // Negative = discharging
   }
 
   // Update battery state
   energy.batteryKWh = Math.max(0, Math.min(batteryCapacity, currentCharge))
 
-  // Recalculate net energy with battery effects
-  const finalEnergyBalance = energyNeeded - energyAvailable
-  if (finalEnergyBalance > 0) {
-    // Still need energy from grid after battery
-    const gridEnergy = Math.max(
-      0,
-      finalEnergyBalance - (currentCharge > 0 ? Math.min(currentCharge, finalEnergyBalance) : 0),
-    )
-    energy.netKWh = gridEnergy
-  } else {
-    // Surplus energy after charging battery
-    energy.netKWh = finalEnergyBalance
-  }
+  // Calculate final net energy flow to/from grid
+  // Positive = importing from grid, Negative = exporting to grid
+  const netEnergyAfterBattery = energyConsumed - energyGenerated - batteryEnergyFlow
+  energy.netKWh = netEnergyAfterBattery
 
   return houseState
 }
