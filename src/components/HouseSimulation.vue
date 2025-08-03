@@ -441,20 +441,25 @@
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr v-for="(row, index) in timeSeriesData.slice(-20)" :key="index"
-                                            :class="{ 'current-hour': row.hour === simulationStore.houseState.time }">
+                                        <tr v-for="(row, index) in timeSeriesData.slice(-20)" :key="index" :class="{
+                                            'current-hour': row.hour === simulationStore.houseState.time,
+                                            'energy-surplus': parseFloat(row.energyBalance) > 0,
+                                            'energy-deficit': parseFloat(row.energyBalance) < 0,
+                                            'battery-full': parseFloat(row.batteryPercent) >= 100,
+                                            'battery-empty': parseFloat(row.batteryPercent) <= 0
+                                        }">
                                             <td>{{ row.hour }}:00</td>
-                                            <td>{{ row.tempOut }}</td>
-                                            <td>{{ row.tempIn }}</td>
+                                            <td>{{ row.tempOut }}°C</td>
+                                            <td>{{ row.tempIn }}°C</td>
                                             <td>{{ row.solarRadiation }}</td>
                                             <td>{{ row.solarKWh }}</td>
                                             <td>{{ row.heatPumpKWh }}</td>
                                             <td>{{ row.ervKWh }}</td>
                                             <td>{{ row.batteryKWh }}</td>
-                                            <td>{{ row.batteryPercent }}</td>
+                                            <td>{{ row.batteryPercent }}%</td>
                                             <td>{{ row.netKWh }}</td>
                                             <td>{{ row.energyBalance }}</td>
-                                            <td>{{ row.comfort }}</td>
+                                            <td>{{ row.comfort }}%</td>
                                             <td>{{ row.henriMode }}</td>
                                             <td>{{ row.hpEnabled ? 'Y' : 'N' }}</td>
                                             <td>{{ row.solarEnabled ? 'Y' : 'N' }}</td>
@@ -545,7 +550,7 @@ const togglePlayback = () => {
 const toggleModule = (moduleName: string) => {
     simulationStore.toggleModule(moduleName)
     simulationStore.runSimulation()
-    
+
     // Auto-log after module toggle
     if (autoLogging.value) {
         nextTick(() => {
@@ -704,13 +709,20 @@ const autoLogging = ref(false)
 
 const logCurrentTimestep = () => {
     const state = simulationStore.houseState
-    const energyBalance = state.energy.solarKWh - state.energy.heatPumpKWh - state.energy.ervKWh
-    
+
+    // Calculate accurate energy balance (positive = surplus, negative = deficit)
+    const energyProduced = state.energy.solarKWh
+    const energyConsumed = state.energy.heatPumpKWh + state.energy.ervKWh
+    const energyBalance = energyProduced - energyConsumed
+
+    // Create unique identifier for this timestep
+    const timestepId = `${state.time}-${state.energy.solarKWh.toFixed(3)}-${state.energy.batteryKWh.toFixed(3)}`
+
     const logEntry = {
         hour: state.time,
         tempOut: state.outdoor.temperature.toFixed(1),
         tempIn: state.indoor.temperature.toFixed(1),
-        solarRadiation: state.outdoor.solarRadiation,
+        solarRadiation: Math.round(state.outdoor.solarRadiation),
         solarKWh: state.energy.solarKWh.toFixed(3),
         heatPumpKWh: state.energy.heatPumpKWh.toFixed(3),
         ervKWh: state.energy.ervKWh.toFixed(3),
@@ -723,23 +735,32 @@ const logCurrentTimestep = () => {
         hpEnabled: isModuleEnabled('heatPump'),
         solarEnabled: isModuleEnabled('solar'),
         batteryEnabled: isModuleEnabled('battery'),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        timestepId: timestepId
     }
-    
-    // Check if this exact entry already exists (prevent duplicates)
-    const lastEntry = timeSeriesData.value[timeSeriesData.value.length - 1]
-    if (!lastEntry || 
-        lastEntry.hour !== logEntry.hour || 
-        lastEntry.timestamp !== logEntry.timestamp ||
-        Math.abs(parseFloat(lastEntry.solarKWh) - parseFloat(logEntry.solarKWh)) > 0.001) {
-        
+
+    // Enhanced duplicate prevention using unique timestep identifier
+    const existingEntry = timeSeriesData.value.find(entry =>
+        entry.hour === logEntry.hour &&
+        Math.abs(parseFloat(entry.solarKWh) - parseFloat(logEntry.solarKWh)) < 0.001 &&
+        Math.abs(parseFloat(entry.batteryKWh) - parseFloat(logEntry.batteryKWh)) < 0.001
+    )
+
+    if (!existingEntry) {
         timeSeriesData.value.push(logEntry)
-        console.log(`📊 Logged timestep ${logEntry.hour}:00 - Solar: ${logEntry.solarKWh} kWh, Battery: ${logEntry.batteryPercent}%`)
+        console.log(`📊 Logged timestep ${logEntry.hour}:00 - Solar: ${logEntry.solarKWh} kWh, Battery: ${logEntry.batteryPercent}%, Balance: ${logEntry.energyBalance} kWh`)
         
+        // Debug battery behavior
+        if (parseFloat(logEntry.batteryPercent) === 0 || parseFloat(logEntry.batteryPercent) === 100) {
+            console.log(`🔋 Battery edge case: ${logEntry.batteryPercent}% (${logEntry.batteryKWh} kWh) - Solar: ${logEntry.solarKWh}, HP: ${logEntry.heatPumpKWh}`)
+        }
+
         // Keep only last 100 entries to prevent memory issues
         if (timeSeriesData.value.length > 100) {
             timeSeriesData.value = timeSeriesData.value.slice(-100)
         }
+    } else {
+        console.log(`⚠️ Skipped duplicate timestep ${logEntry.hour}:00`)
     }
 }
 
@@ -1697,6 +1718,26 @@ input:checked+.toggle-slider:before {
 .timeseries-table tbody tr.current-hour td {
     background-color: #dbeafe !important;
     border-color: #3b82f6;
+    font-weight: 700;
+}
+
+.timeseries-table tbody tr.energy-surplus td {
+    background-color: #d1fae5 !important;
+}
+
+.timeseries-table tbody tr.energy-deficit td {
+    background-color: #fee2e2 !important;
+}
+
+.timeseries-table tbody tr.battery-full td:nth-child(9) {
+    background-color: #dcfce7 !important;
+    color: #166534;
+    font-weight: 700;
+}
+
+.timeseries-table tbody tr.battery-empty td:nth-child(9) {
+    background-color: #fecaca !important;
+    color: #991b1b;
     font-weight: 700;
 }
 
