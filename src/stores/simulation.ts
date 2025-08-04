@@ -258,7 +258,20 @@ export const useSimulationStore = defineStore(
     }
 
     const addModule = (module: SimulationModule) => {
+      // Always push new module (HouseSimulation will clear array first)
       modules.value.push(module)
+      console.log(`✅ Added module: ${module.name} (simulate: ${typeof module.simulate === 'function'})`)
+    }
+
+    const ensureModulesInitialized = () => {
+      // Check if any module is missing simulate function
+      const brokenModules = modules.value.filter(m => typeof m.simulate !== 'function')
+      if (brokenModules.length > 0) {
+        console.warn('⚠️ Found modules without simulate functions, clearing all modules')
+        modules.value = []
+        return false
+      }
+      return true
     }
 
     const toggleModule = (moduleName: string) => {
@@ -514,6 +527,12 @@ export const useSimulationStore = defineStore(
         try {
           const moduleStartTime = performance.now()
           const preModuleState = JSON.parse(JSON.stringify(houseState))
+
+          // Safety check: ensure module has simulate function
+          if (typeof module.simulate !== 'function') {
+            console.error(`❌ Module ${module.name} missing simulate function`)
+            continue
+          }
 
           // Pass module config for modules that need it
           if (module.name === 'heatPump') {
@@ -1052,10 +1071,15 @@ export const useSimulationStore = defineStore(
       houseState.seasonalDateId ? getSeasonalDateById(houseState.seasonalDateId) : null
 
     // Multi-Day Simulation Methods
-    const startMultiDaySimulation = async (days: number = 30, withHenri: boolean = true) => {
+    const startMultiDaySimulation = async (days: number = 7, withHenri: boolean = true) => { // Reduced default from 30 to 7
       console.log(
         `🚀 Starting ${days}-day simulation ${withHenri ? 'WITH' : 'WITHOUT'} Henri's adaptive intelligence`,
       )
+      console.log(`🏠 Initial module states:`)
+      modules.value.forEach(module => {
+        console.log(`  ${module.name}: ${module.enabled}`)
+      })
+      console.log(`  Current mode: ${currentMode.value}`)
 
       multiDaySimulation.isRunning = true
       multiDaySimulation.currentDay = 1
@@ -1088,9 +1112,9 @@ export const useSimulationStore = defineStore(
         const dailyMetrics = await simulateDay(day, withHenri)
         multiDaySimulation.dailyMetrics.push(dailyMetrics)
 
-        // Yield control to UI every 5 days for better responsiveness
-        if (day % 5 === 0) {
-          await new Promise((resolve) => setTimeout(resolve, 0))
+        // Yield control to UI more frequently for better responsiveness
+        if (day % 2 === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 1)) // Allow UI updates every 2 days
         }
       }
 
@@ -1114,6 +1138,8 @@ export const useSimulationStore = defineStore(
     }
 
     const simulateDay = async (day: number, withHenri: boolean): Promise<DailyMetrics> => {
+      console.log(`🌅 Starting day ${day} simulation (Henri: ${withHenri})`)
+      
       let dailyEnergyConsumed = 0
       let dailyEnergyProduced = 0
       let dailyComfortSum = 0
@@ -1129,6 +1155,13 @@ export const useSimulationStore = defineStore(
       let coolingCycles = 0
 
       const previousHeatPumpState = { ...moduleConfigs.heatPump }
+
+      // Log initial module states
+      console.log(`📊 Module states at start of day ${day}:`)
+      modules.value.forEach(module => {
+        console.log(`  ${module.name}: ${module.enabled}`)
+      })
+      console.log(`  Current mode: ${currentMode.value}`)
 
       // Simulate 24 hours
       for (let hour = 0; hour < 24; hour++) {
@@ -1166,9 +1199,20 @@ export const useSimulationStore = defineStore(
         // Run simulation step
         runSimulation()
 
-        // Track metrics
-        dailyEnergyConsumed += houseState.energy.heatPumpKWh + houseState.energy.ervKWh
+        // Yield control to UI every 6 hours to prevent browser freeze
+        if (hour % 6 === 0) {
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        }
+
+        // Track metrics with detailed logging for first few hours
+        const hourlyConsumption = houseState.energy.heatPumpKWh + houseState.energy.ervKWh
+        dailyEnergyConsumed += hourlyConsumption
         dailyEnergyProduced += houseState.energy.solarKWh
+
+        if (hour < 3 || (hour === 12 && day === 1)) { // Log first few hours and noon of first day
+          console.log(`    Hour ${hour}: HP=${houseState.energy.heatPumpKWh.toFixed(3)}, ERV=${houseState.energy.ervKWh.toFixed(3)}, Solar=${houseState.energy.solarKWh.toFixed(3)}, Mode=${currentMode.value}`)
+        }
+
         dailyComfortSum += houseState.comfortScore
 
         // Track comfort metrics with granular thresholds
@@ -1233,6 +1277,13 @@ export const useSimulationStore = defineStore(
       const costSavings = withHenri ? netEnergy * 0.15 : 0 // Henri saves ~15% on energy costs
       const co2Emissions = netEnergy * 0.4 // kg CO2 per kWh (average grid mix)
 
+      console.log(`🌇 Day ${day} complete (Henri: ${withHenri}):`)
+      console.log(`  Energy consumed: ${dailyEnergyConsumed.toFixed(3)} kWh`)
+      console.log(`  Energy produced: ${dailyEnergyProduced.toFixed(3)} kWh`)
+      console.log(`  Net energy: ${netEnergy.toFixed(3)} kWh`)
+      console.log(`  Avg comfort: ${avgComfort.toFixed(1)}`)
+      console.log(`  Adaptive actions: ${adaptiveActions}`)
+
       return {
         day,
         henriEnabled: withHenri,
@@ -1260,6 +1311,10 @@ export const useSimulationStore = defineStore(
       const henri = multiDaySimulation.currentRun
       const baseline = multiDaySimulation.baselineRun
 
+      console.log('🔍 Calculating comparison metrics...')
+      console.log('Henri data points:', henri.length)
+      console.log('Baseline data points:', baseline.length)
+
       // Total energy consumption
       multiDaySimulation.comparisonMetrics.totalEnergyConsumption.henri = henri.reduce(
         (sum, day) => sum + day.energyConsumed,
@@ -1270,15 +1325,21 @@ export const useSimulationStore = defineStore(
         0,
       )
 
-      // Energy cost (assuming $0.15/kWh)
+      // Energy cost (based on net energy consumption)
       multiDaySimulation.comparisonMetrics.totalEnergyCost.henri = henri.reduce(
-        (sum, day) => sum + day.netEnergy * 0.15,
+        (sum, day) => sum + Math.max(0, day.netEnergy) * 0.15, // Only count positive net energy (consumed from grid)
         0,
       )
       multiDaySimulation.comparisonMetrics.totalEnergyCost.baseline = baseline.reduce(
-        (sum, day) => sum + day.netEnergy * 0.15,
+        (sum, day) => sum + Math.max(0, day.netEnergy) * 0.15,
         0,
       )
+
+      // Average comfort score
+      multiDaySimulation.comparisonMetrics.totalComfortScore.henri = 
+        henri.reduce((sum, day) => sum + day.avgComfort, 0) / henri.length
+      multiDaySimulation.comparisonMetrics.totalComfortScore.baseline = 
+        baseline.reduce((sum, day) => sum + day.avgComfort, 0) / baseline.length
 
       // Excellent comfort hours (≥90%)
       multiDaySimulation.comparisonMetrics.excellentComfortHours.henri = henri.reduce(
@@ -1317,6 +1378,40 @@ export const useSimulationStore = defineStore(
 
       multiDaySimulation.comparisonMetrics.comfortRecoveryTime.henri = henriAvgRecoveryTime
       multiDaySimulation.comparisonMetrics.comfortRecoveryTime.baseline = baselineAvgRecoveryTime
+
+      // Adaptive actions
+      multiDaySimulation.comparisonMetrics.adaptiveActions.henri = henri.reduce(
+        (sum, day) => sum + day.adaptiveActions,
+        0,
+      )
+      multiDaySimulation.comparisonMetrics.adaptiveActions.baseline = baseline.reduce(
+        (sum, day) => sum + day.adaptiveActions,
+        0,
+      )
+
+      // CO2 savings (Henri's reduction vs baseline)
+      const henriCO2 = henri.reduce((sum, day) => sum + day.co2Emissions, 0)
+      const baselineCO2 = baseline.reduce((sum, day) => sum + day.co2Emissions, 0)
+      multiDaySimulation.comparisonMetrics.co2Savings.henri = Math.max(0, baselineCO2 - henriCO2)
+
+      // Energy efficiency (simplified as 1 / energy consumption ratio)
+      const henriTotalConsumption = multiDaySimulation.comparisonMetrics.totalEnergyConsumption.henri
+      const baselineTotalConsumption = multiDaySimulation.comparisonMetrics.totalEnergyConsumption.baseline
+
+      if (henriTotalConsumption > 0 && baselineTotalConsumption > 0) {
+        multiDaySimulation.comparisonMetrics.energyEfficiency.henri = 
+          (1 / henriTotalConsumption) * 1000 // Normalized efficiency score
+        multiDaySimulation.comparisonMetrics.energyEfficiency.baseline = 
+          (1 / baselineTotalConsumption) * 1000
+      } else {
+        multiDaySimulation.comparisonMetrics.energyEfficiency.henri = 0
+        multiDaySimulation.comparisonMetrics.energyEfficiency.baseline = 0
+      }
+
+      console.log('📊 Comparison metrics calculated:')
+      console.log('Energy consumption - Henri:', henriTotalConsumption, 'Baseline:', baselineTotalConsumption)
+      console.log('Comfort scores - Henri:', multiDaySimulation.comparisonMetrics.totalComfortScore.henri, 'Baseline:', multiDaySimulation.comparisonMetrics.totalComfortScore.baseline)
+      console.log('Excellent comfort hours - Henri:', multiDaySimulation.comparisonMetrics.excellentComfortHours.henri, 'Baseline:', multiDaySimulation.comparisonMetrics.excellentComfortHours.baseline)
 
       // Average comfort score
       multiDaySimulation.comparisonMetrics.totalComfortScore.henri =
@@ -1360,8 +1455,21 @@ export const useSimulationStore = defineStore(
       console.log('📊 Comparison metrics calculated:', multiDaySimulation.comparisonMetrics)
     }
 
-    const runHenriComparison = async (days: number = 30) => {
+    const runHenriComparison = async (days: number = 7) => { // Reduced default from 30 to 7 days
       console.log('🔬 Starting Henri vs Baseline comparison study...')
+
+      // Validate days input to prevent browser freeze
+      if (days > 30) {
+        console.warn('⚠️ Limiting simulation to 30 days to prevent browser freeze')
+        days = 30
+      }
+
+      // Check if modules are properly initialized
+      const brokenModules = modules.value.filter(m => typeof m.simulate !== 'function')
+      if (brokenModules.length > 0) {
+        console.error('❌ Cannot run comparison - modules missing simulate functions:', brokenModules.map(m => m.name))
+        throw new Error('Modules not properly initialized. Please refresh the page.')
+      }
 
       // First run without Henri (baseline)
       await startMultiDaySimulation(days, false)
@@ -1420,6 +1528,7 @@ export const useSimulationStore = defineStore(
       // Actions
       setTime,
       addModule,
+      ensureModulesInitialized,
       toggleModule,
       runSimulation,
       startSimulation,
@@ -1457,7 +1566,7 @@ export const useSimulationStore = defineStore(
     persist: {
       key: 'henri-simulation',
       storage: localStorage,
-      omit: ['isPlaying', 'multiDaySimulation.isRunning'],
+      omit: ['isPlaying', 'multiDaySimulation.isRunning', 'modules'],
     },
   },
 )

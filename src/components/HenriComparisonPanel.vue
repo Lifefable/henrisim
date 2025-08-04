@@ -119,29 +119,6 @@
                     </div>
                 </div>
 
-                <!-- Excellent Comfort Hours -->
-                <div class="metric-comparison">
-                    <div class="metric-header">
-                        <span class="metric-icon">⭐</span>
-                        <span class="metric-title">Excellent Comfort Hours (≥90%)</span>
-                    </div>
-                    <div class="metric-values">
-                        <div class="metric-value baseline">
-                            <span class="label">Baseline:</span>
-                            <span class="value">{{ metrics.excellentComfortHours.baseline }} / {{ totalHours }}
-                                hrs</span>
-                        </div>
-                        <div class="metric-value henri">
-                            <span class="label">With Henri:</span>
-                            <span class="value">{{ metrics.excellentComfortHours.henri }} / {{ totalHours }} hrs</span>
-                        </div>
-                        <div class="metric-savings" :class="{ positive: excellentComfortImprovement > 0 }">
-                            <span class="savings-value">+{{ excellentComfortImprovement }} hrs</span>
-                            <span class="savings-label">More Excellent Hours</span>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Good Comfort Hours -->
                 <div class="metric-comparison">
                     <div class="metric-header">
@@ -158,8 +135,8 @@
                             <span class="value">{{ metrics.goodComfortHours.henri }} / {{ totalHours }} hrs</span>
                         </div>
                         <div class="metric-savings" :class="{ positive: goodComfortImprovement > 0 }">
-                            <span class="savings-value">+{{ goodComfortImprovement }} hrs</span>
-                            <span class="savings-label">More Good Hours</span>
+                            <span class="savings-value">{{ goodComfortImprovement > 0 ? '+' : '' }}{{ goodComfortImprovement }} hrs</span>
+                            <span class="savings-label">{{ goodComfortImprovement > 0 ? 'More Good Hours' : 'Fewer Good Hours' }}</span>
                         </div>
                     </div>
                 </div>
@@ -179,7 +156,7 @@
                             <span class="label">Henri Recovery:</span>
                             <span class="value">{{ metrics.comfortRecoveryTime.henri.toFixed(1) }} hrs</span>
                         </div>
-                        <div class="metric-savings" :class="{ positive: comfortRecoveryImprovement > 0 }">
+                                                <div class="metric-savings" :class="{ positive: comfortRecoveryImprovement > 0 }">
                             <span class="savings-value">{{ Math.abs(comfortRecoveryImprovement).toFixed(1) }} hrs</span>
                             <span class="savings-label">{{ comfortRecoveryImprovement > 0 ? 'Faster Recovery' : 'Slower Recovery' }}</span>
                         </div>
@@ -289,12 +266,8 @@
                         {{ comfortImprovement.toFixed(1) }}% improvement in average comfort
                     </div>
                     <div class="summary-item">
-                        <strong>Excellent Comfort:</strong>
-                        +{{ excellentComfortImprovement }} more hours at excellent comfort (≥90%)
-                    </div>
-                    <div class="summary-item">
                         <strong>Good Comfort:</strong>
-                        +{{ goodComfortImprovement }} more hours at good comfort (≥80%)
+                        {{ goodComfortImprovement > 0 ? '+' + goodComfortImprovement + ' more' : Math.abs(goodComfortImprovement) + ' fewer' }} hours at good comfort (≥80%)
                     </div>
                     <div class="summary-item">
                         <strong>Comfort Recovery:</strong>
@@ -338,7 +311,7 @@ import { useSimulationStore } from '@/stores/simulation'
 import BaseButton from '@/components/ui/BaseButton.vue'
 
 const simulationStore = useSimulationStore()
-const selectedDays = ref(30)
+const selectedDays = ref(7) // Reduced from 30 to prevent browser freeze
 
 const hasComparisonData = computed(() =>
     simulationStore.multiDaySimulation.baselineRun &&
@@ -370,11 +343,6 @@ const efficiencyImprovement = computed(() => {
 })
 
 const totalHours = computed(() => simulationStore.multiDaySimulation.totalDays * 24)
-
-const excellentComfortImprovement = computed(() => {
-    if (!hasComparisonData.value) return 0
-    return metrics.value.excellentComfortHours.henri - metrics.value.excellentComfortHours.baseline
-})
 
 const goodComfortImprovement = computed(() => {
     if (!hasComparisonData.value) return 0

@@ -576,10 +576,16 @@ const timeSlider = computed({
 
 // Initialize modules
 onMounted(() => {
+    // Always clear and re-initialize modules to prevent persistence corruption
+    simulationStore.modules.length = 0
+    
     simulationStore.addModule(createHeatPumpModule())
     simulationStore.addModule(createERVModule())
     simulationStore.addModule(createSolarModule())
     simulationStore.addModule(createBatteryModule())
+    
+    console.log('🔧 Modules forcefully re-initialized on mount')
+    console.log('Module check:', simulationStore.modules.map(m => ({ name: m.name, hasSimulate: typeof m.simulate === 'function' })))
 
     // Auto-enable data logging  
     autoLogging.value = true
