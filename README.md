@@ -290,20 +290,3 @@ npm run lint
 # Type check
 npm run type-check
 ```
-
-## 📄 License
-
-This project is proprietary and confidential. All rights reserved by Lifefable.
-
-## 📞 Support
-
-For questions, issues, or feature requests:
-- **GitHub Issues**: [Create an issue](https://github.com/Lifefable/henrisim/issues)
-- **Documentation**: See `spec.md` for detailed technical specifications
-- **Email**: Contact the development team
-
----
-
-**Henri Home Passive House Simulation** - Advancing sustainable building performance through intelligent environmental systems.
-
-*Built with ❤️ by Lifefable Team*
